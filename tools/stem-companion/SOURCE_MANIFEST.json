@@ -1,10 +1,10 @@
 {
-  "description": "Original local-only companion source and attributed CC0 drum samples; no user music, generated stems, weights, executable binaries or credentials. Project license not selected.",
+  "description": "Local companion source, attributed CC0 pad recordings, and one user-authorized publicly distributed four-stem sample; no model weights, executables, credentials or other user music. Project license not selected.",
   "files": [
     {
       "path": ".gitignore",
-      "bytes": 206,
-      "sha256": "b9cb52d7376a9f75ead1ddce0b937fe6902dee394d7a354cefc7a994bebff6a2"
+      "bytes": 226,
+      "sha256": "4aadf46044bb1d606879694615e5aa3f707dd24d4283efb99b58768a7c7b7302"
     },
     {
       "path": "README.md",
@@ -90,6 +90,41 @@
       "path": "static/samples/crash.m4a",
       "bytes": 283675,
       "sha256": "97ab72cdabd195de0a01a7f1966e6780d63428337d069e7932b46fa8fa0ee29a"
+    },
+    {
+      "path": ".gitattributes",
+      "bytes": 25,
+      "sha256": "eb75853b1c6e079a10af5470282db7bcdb8608d5f5686de928a8cb71c96882f4"
+    },
+    {
+      "path": "bundled-demo/README.md",
+      "bytes": 544,
+      "sha256": "c0058d81ff7d4f06ea372e35eb59a315400765eb2dcd84f2e1ca0e039c60c3b8"
+    },
+    {
+      "path": "bundled-demo/metadata.json",
+      "bytes": 3202,
+      "sha256": "25e998e9b899330fb367e7931a5aed183e813b3d3c0aed537fd1eda875ddf590"
+    },
+    {
+      "path": "bundled-demo/vocals.wav",
+      "bytes": 36044878,
+      "sha256": "bc2bad50afe74c3f51bb74152e753c12782572dde1c00b73dc90eac0be6f529e"
+    },
+    {
+      "path": "bundled-demo/bass.wav",
+      "bytes": 36044878,
+      "sha256": "98bcf38778c1d88175c2d7a9ad355c055ef4aac33b46c3123608b9e9404a82d9"
+    },
+    {
+      "path": "bundled-demo/drums.wav",
+      "bytes": 36044878,
+      "sha256": "658340b7fdee0769640a8002515e72d8fd8db2bdf7c6d834a40cd4b777a0d79c"
+    },
+    {
+      "path": "bundled-demo/other.wav",
+      "bytes": 36044878,
+      "sha256": "ddc08731986c105855c87d1d4b9da432dd520dd414dc8c786c6856c1a7bdf186"
     }
   ]
 }

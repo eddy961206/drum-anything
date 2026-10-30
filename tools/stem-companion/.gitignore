@@ -19,3 +19,4 @@ separated/
 *.log
 !static/samples/*.m4a
 !static/samples/*.flac
+!bundled-demo/*.wav
