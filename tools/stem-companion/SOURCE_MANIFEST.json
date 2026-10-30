@@ -3,48 +3,48 @@
   "files": [
     {
       "path": ".gitignore",
-      "bytes": 161,
-      "sha256": "cb1a1ea9e32cc8cc3ba81c22954c2c7a13c6c0709d4849e7f6846b36adce0de8"
+      "bytes": 206,
+      "sha256": "b9cb52d7376a9f75ead1ddce0b937fe6902dee394d7a354cefc7a994bebff6a2"
     },
     {
       "path": "README.md",
-      "bytes": 16097,
-      "sha256": "ee4a8c437bae3e291347dde227ba2c0f74caf38ef182d57b298e3341e78c30d3"
+      "bytes": 16596,
+      "sha256": "bca7fe3c1b2a40e4473f4ed6c3df6174add6dca820164ce68d2a879a383e676f"
     },
     {
       "path": "VERIFICATION.md",
-      "bytes": 7387,
-      "sha256": "0854863c22cb643fdaa24cd04daedf4afd33ca15b49cd3c7f5dbf09a84c95442"
+      "bytes": 7617,
+      "sha256": "9cf0de8aa13b21839e39459c325fc55a4c385ac2fef1cda5cd2d59297ef31262"
     },
     {
       "path": "companion.py",
-      "bytes": 42711,
-      "sha256": "22d2316cf078eec4a572d1c473a3c37680108887d2673f21655ccfda5ac0346b"
+      "bytes": 43021,
+      "sha256": "6a1c276e7b5ade1e5dff5b19608fba6a57454fd03d5c2861fcf1d3a914441b85"
     },
     {
       "path": "static/index.html",
-      "bytes": 10221,
-      "sha256": "ee4f1b30ab406502801737c54984abe088f976785b9287a37bbff0f3563f4770"
+      "bytes": 11480,
+      "sha256": "8b6e24965117aca45eae92e6370c6012f6ec65d0d12f960720d35eb48f9a938e"
     },
     {
       "path": "static/app.js",
-      "bytes": 40253,
-      "sha256": "f656ab3ad5a5a6c98b6e64614459048367f8efd9dda8badcadf29f2d919f2334"
+      "bytes": 44460,
+      "sha256": "6fee7a8d88cd7ab9e7975c7cd027692b0b116ba321fc81338149be3f1a45a0b9"
     },
     {
       "path": "static/style.css",
-      "bytes": 13016,
-      "sha256": "e32f16ea4d86ac6543f32991ef76ba393ac2850bdb73089f8d8aa88bc6021b98"
+      "bytes": 14127,
+      "sha256": "ca240f921ce93c1e5c80fdb19467b386ed5a2b012e0a20b958253d3e133e9e1e"
     },
     {
       "path": "tests/test_companion.py",
-      "bytes": 30387,
-      "sha256": "607fba510a4a72cda9b915f03505915ae302dcec3a3f8759b6238f1ee002fbe6"
+      "bytes": 30944,
+      "sha256": "053f0ff257c538450b3ed59a4ced44e88f8ae2ecf70065abddb79212f306d4df"
     },
     {
       "path": "tests/test_ui.cjs",
-      "bytes": 15372,
-      "sha256": "4962397045ccd4830829d8bdbf6b2592e2481616bf881024e0e1f935bc5684ee"
+      "bytes": 16958,
+      "sha256": "9e207dcf9009b46279bb3496e28e7b036d9700c367f01f939941e2d4b7022a4f"
     },
     {
       "path": "static/youtube-preview.html",
@@ -55,6 +55,41 @@
       "path": "static/youtube-preview.js",
       "bytes": 4012,
       "sha256": "a757638058a91ddc9281b874f6a723d7356d150f7adcaa6bca976f0f8223e092"
+    },
+    {
+      "path": "static/samples/README.md",
+      "bytes": 1207,
+      "sha256": "9af38622d5c1b3ceff545669d003b22a6b73ec2032a2098374da97b519eb2027"
+    },
+    {
+      "path": "static/samples/kick.m4a",
+      "bytes": 47539,
+      "sha256": "0a3f3ef4c5b28029582a524d0f9732a98e6240a506e6115cff16f267f3c0c80b"
+    },
+    {
+      "path": "static/samples/snare.m4a",
+      "bytes": 39680,
+      "sha256": "bb7d458d43fde6b60202c97fc5a84c0b628eee9275b3d1e707c09f843eec1930"
+    },
+    {
+      "path": "static/samples/tom.flac",
+      "bytes": 222272,
+      "sha256": "adc4d06cd73e10611e6dfc31d238319c80e6c8c3e0c74d75c255820af2d1e196"
+    },
+    {
+      "path": "static/samples/hat.m4a",
+      "bytes": 16517,
+      "sha256": "806e4a9f48070270aee05fb2f1ed1e2689d6ac4dc1bda899dde803156615c057"
+    },
+    {
+      "path": "static/samples/open-hat.m4a",
+      "bytes": 229685,
+      "sha256": "5d9155f0dffffdcbe00a128de1428ba2cfb9aff3244987baf9f120ff5371c4c2"
+    },
+    {
+      "path": "static/samples/crash.m4a",
+      "bytes": 283675,
+      "sha256": "97ab72cdabd195de0a01a7f1966e6780d63428337d069e7932b46fa8fa0ee29a"
     }
   ]
 }

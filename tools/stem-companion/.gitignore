@@ -17,3 +17,5 @@ separated/
 *.safetensors
 *.pth
 *.log
+!static/samples/*.m4a
+!static/samples/*.flac

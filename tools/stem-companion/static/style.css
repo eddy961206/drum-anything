@@ -26,3 +26,14 @@
   .selection-heading { flex-wrap: wrap; }
   .selection-actions button { flex: 1 1 auto; }
 }
+.loop-settings { margin: 12px 0 18px; padding: 13px 16px; border: 1px solid var(--line); border-radius: 12px; background: #1b1524; }
+.loop-mode { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.loop-mode span { margin-right: 5px; }
+.loop-mode button { border: 1px solid #6f5d80; border-radius: 8px; background: transparent; padding: 8px 12px; font-size: 12px; }
+.loop-mode button.selected { background: var(--violet); border-color: var(--violet); color: #21172d; font-weight: 700; }
+.loop-section { margin-top: 15px; }
+.loop-section label { display: grid; grid-template-columns: 70px 1fr; gap: 12px; align-items: center; margin-top: 9px; color: var(--muted); font-size: 12px; }
+.loop-section input[type=range] { width: 100%; accent-color: var(--violet); }
+.pad-volume { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 18px auto 0; color: var(--muted); font-size: 12px; }
+.pad-volume input { width: min(190px, 40vw); accent-color: var(--violet); }
+.pad-volume output { min-width: 35px; font-variant-numeric: tabular-nums; }

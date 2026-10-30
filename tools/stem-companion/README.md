@@ -12,8 +12,8 @@
 - 외부 설치 Demucs `htdemucs`로 vocals / bass / drums / other 4개 정렬 스템 생성.
 - 긴 곡은 겹치는 조각으로 분리하고 부드럽게 이어 붙입니다. 네 파트에는 같은 크기 보정을 적용합니다.
 - 완료 시 브라우저가 재생에 필요한 부분만 불러옵니다. 재생은 직접 버튼을 누릅니다.
-- 전체 / 보컬 / 반주 / 드러머 모드, 개별 볼륨, 탐색, 구간 반복.
-- 분리된 드럼의 실제 파형 에너지 변화로 **추정 타격 시점** 표시. D 킥, F 스네어, S 톰, J 닫힌 하이햇, K 열린 하이햇, L 크래시를 키보드나 화면 패드로 연주합니다. 타격 시점은 정확한 악보나 드럼 종류 판별이 아닙니다.
+- 전체 / 보컬 / 반주 / 드러머 모드, 개별 볼륨, 탐색, 전체 곡 반복과 연주 중 시작·끝을 지정하는 구간 반복.
+- 분리된 드럼의 실제 파형 에너지 변화로 **추정 타격 시점** 표시. D 킥, F 스네어, S 톰, J 닫힌 하이햇, K 열린 하이햇, L 크래시를 키보드나 화면 패드로 연주합니다. 패드 음량은 반주와 별도로 조절합니다. 타격 시점은 정확한 악보나 드럼 종류 판별이 아닙니다.
 - 실제 단계 표시, 취소(자식 프로세스 포함 종료), 로컬 파일 삭제. 가짜 진행률은 없습니다.
 
 ## 먼저 알아둘 점
@@ -78,7 +78,7 @@ Deno/yt-dlp/ejs가 없어도 로컬 파일 경로의 필요 도구가 있으면 
 
 로컬 모델 모드는 고정된 `htdemucs` 이름과 명시적인 `--repo`를 사용하여 Demucs의 로컬 로더를 선택하고, `HF_HUB_OFFLINE=1` 및 `TRANSFORMERS_OFFLINE=1`을 설정합니다. 모델 라이브러리의 다운로드 제한이며 사용자가 제출한 YouTube 취득을 막는 전역 네트워크 차단은 아닙니다. **YAML과 가중치는 신뢰할 수 있는 출처만 사용하세요.** 로컬 `.th` 체크포인트의 역직렬화는 안전하지 않은 파일에서 코드를 실행할 수 있습니다. 필요한 파일이 없거나 형식이 맞지 않으면 작업은 실패하고 원격 모델로 대체하지 않습니다. [Demucs 로컬 모델 로더](https://github.com/adefossez/demucs/blob/v4.1.0/demucs/repo.py)
 
-Windows는 위 `.venv/bin/python` 대신 `.\.venv\Scripts\python.exe`를 사용하세요. 기본 포트가 Windows 예약 범위에 있으면 사용 가능한 포트를 `--port 4175`처럼 지정하세요. `--allow-model-download`는 이 프로세스를 위한 **명시적 선택**입니다. 없으면 기본적으로 모델 다운로드를 시작하지 않고 의존성 부족을 표시합니다. **이 리포지터리에 가중치나 바이너리는 들어 있지 않습니다.**
+Windows는 위 `.venv/bin/python` 대신 `.\.venv\Scripts\python.exe`를 사용하세요. 기본 포트가 Windows 예약 범위에 있으면 사용 가능한 포트를 `--port 4175`처럼 지정하세요. `--allow-model-download`는 이 프로세스를 위한 **명시적 선택**입니다. 없으면 기본적으로 모델 다운로드를 시작하지 않고 의존성 부족을 표시합니다. **모델 가중치와 외부 실행 프로그램은 이 저장소에 포함되지 않습니다.**
 
 브라우저에서 **http://127.0.0.1:8765** 또는 지정한 포트를 열고 소스와 전체 곡/구간을 선택합니다. YouTube 미리보기가 차단되면 숫자로 구간을 직접 입력할 수 있습니다. 첫 작업은 모델 다운로드 및 초기화로 오래 걸릴 수 있습니다. CPU 기본값은 수 분 이상 걸릴 수 있고 RAM과 저장 공간을 별도로 필요로 합니다. 호환 GPU가 설정된 경우 `--device cuda` 또는 지원되는 Mac에서 `--device mps`를 직접 선택할 수 있습니다.
 
@@ -134,6 +134,7 @@ node --test tests/test_ui.cjs
 - [Demucs 출력과 모델 설명](https://github.com/adefossez/demucs#separating-tracks) — 파트별 자동 크기 보정이 상대 볼륨을 바꿀 수 있어 float 출력 후 전체 파트에 공통 보정을 적용. `htdemucs_ft`는 더 오래 걸리며 곡별 개선을 보장하지 않아 기본 모델을 임의로 바꾸지 않음.
 - [YouTube IFrame Player API](https://developers.google.com/youtube/iframe_api_reference)와 [waveSurfer Regions](https://github.com/katspaugh/wavesurfer.js/blob/main/examples/regions.js) — 영상 위치와 시작·끝 선택 방식 참고. 외부 라이브러리 코드를 포함하지 않음.
 - [Drummeria](https://github.com/ipald/drummeria) — 닫힌 하이햇이 열린 하이햇을 끊는 연주 동작 참고. 이 저장소의 코드는 복사하지 않음.
+- [Virtuosity Drums](https://github.com/sfzinstruments/virtuosity_drums)와 [Keyboardia의 CC0 샘플](https://github.com/adewale/keyboardia/blob/869d3f5095084003e1251aa3ebf2eab8f65f62fe/app/public/instruments/LICENSE.md) — 여섯 드럼 패드에 실제 녹음 사용. 파일별 출처와 라이선스는 [`static/samples/README.md`](static/samples/README.md) 참고.
 - [Web Audio의 동기 재생](https://github.com/mdn/content/blob/main/files/en-us/games/techniques/audio_for_web_games/index.md) — 한 오디오 시계에 파트를 예약하는 방식 참고.
 - [FFmpeg](https://ffmpeg.org/legal.html) — 별도 설치 바이너리. 빌드 구성에 따라 LGPL/GPL 조건이 다릅니다.
 - [StemRoller](https://github.com/stemrollerapp/stemroller), 특히 [`processQueue.js`](https://github.com/stemrollerapp/stemroller/blob/main/main-src/processQueue.js) — 취득→분리의 직렬 큐/취소/캐시 설계 참고. Unlicense 또는 MIT No Attribution. 해당 소스를 벤더링하지 않았습니다.

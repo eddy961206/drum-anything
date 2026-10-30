@@ -2,6 +2,14 @@
 const $ = (id) => document.getElementById(id);
 const STEMS = ['vocals', 'bass', 'drums', 'other'];
 const PAD_KEYS = { KeyD: 'kick', KeyF: 'snare', KeyS: 'tom', KeyJ: 'hat', KeyK: 'open-hat', KeyL: 'crash' };
+const PAD_SAMPLES = {
+  kick: { file: 'kick.m4a', gain: 3.5, offset: 0.005, length: 1.0 },
+  snare: { file: 'snare.m4a', gain: 0.9, offset: 0.008, length: 1.2 },
+  tom: { file: 'tom.flac', gain: 1.5, offset: 0.006, length: 1.2 },
+  hat: { file: 'hat.m4a', gain: 5.5, offset: 0, length: 0.35 },
+  'open-hat': { file: 'open-hat.m4a', gain: 3.2, offset: 0, length: 2.0 },
+  crash: { file: 'crash.m4a', gain: 3.5, offset: 0, length: 4.0 },
+};
 const LABELS = { vocals: '보컬', bass: '베이스', drums: '드럼', other: '다른 악기' };
 const MODES = { all: STEMS, vocals: ['vocals'], instrumental: ['bass', 'drums', 'other'], drummer: ['vocals', 'bass', 'other'] };
 const TERMINAL = new Set(['ready', 'failed', 'cancelled', 'dependency_missing']);
@@ -12,11 +20,13 @@ let rangeMode = 'full', previewId = '', previewRequest = 0, previewReady = false
 let previewTime = 0, previewDuration = 0, previewTimer = null, selectionTouched = false;
 const previewOrigin = `${location.protocol}//localhost:${location.port}`;
 let loadedId = null, loadingId = null, loadGeneration = 0, loadController = null;
-let ctx = null, master = null, nodes = [], gains = {}, duration = 0, offset = 0, startedAt = 0;
+let ctx = null, master = null, padMaster = null, nodes = [], gains = {}, duration = 0, offset = 0, startedAt = 0;
 let audioJob = null, chunkSeconds = 0, chunkCount = 0, chunkCache = new Map(), chunkLoads = new Map(), scheduleTimer = null;
 let playing = false, playbackLoop = true, playbackGeneration = 0, audioLoaded = false, onsets = [];
 let seeking = false, resumeAfterSeek = false;
-let noiseBuffer = null, openHatVoice = null;
+let loopMode = 'full', repeatStart = 0, repeatEnd = 0, playbackStart = 0, playbackEnd = 0;
+let loopEditing = false, resumeAfterLoop = false;
+let padBytesPromise = null, padBuffersPromise = null, openHatVoice = null;
 const volumes = Object.fromEntries(STEMS.map((stem) => [stem, 0.8]));
 const muted = Object.fromEntries(STEMS.map((stem) => [stem, false]));
 
@@ -314,13 +324,15 @@ function audioContext() {
     const limiter = ctx.createDynamicsCompressor();
     limiter.threshold.value = -8; limiter.knee.value = 12; limiter.ratio.value = 8;
     master.connect(limiter); limiter.connect(ctx.destination);
+    padMaster = ctx.createGain(); padMaster.gain.value = Number($('pad-volume').value); padMaster.connect(master);
   }
   return ctx;
 }
 function position() {
   if (!playing || !ctx) return offset;
   const elapsed = offset + Math.max(0, ctx.currentTime - startedAt);
-  return playbackLoop && duration > 0 ? elapsed % duration : Math.min(duration, elapsed);
+  const span = playbackEnd - playbackStart;
+  return playbackLoop && span > 0 ? playbackStart + ((elapsed - playbackStart) % span + span) % span : Math.min(duration, elapsed);
 }
 function stopSources() {
   playbackGeneration += 1;
@@ -338,6 +350,7 @@ function resetAudio() {
   stopSources();
   chunkCache.clear(); chunkLoads.clear(); audioJob = null; chunkSeconds = 0; chunkCount = 0;
   duration = 0; offset = 0; onsets = []; audioLoaded = false; loadedId = null; loadingId = null; seeking = false; resumeAfterSeek = false;
+  repeatStart = 0; repeatEnd = 0; loopEditing = false; resumeAfterLoop = false;
   $('play').disabled = true; $('seek').disabled = true; $('seek').value = '0';
   $('stem-downloads').replaceChildren();
 }
@@ -359,6 +372,7 @@ async function loadAudio(readyJob) {
     if (generation !== loadGeneration || job?.id !== readyJob.id) return;
     onsets = (readyJob.onsets || []).filter((value) => Number.isFinite(value) && value >= 0 && value < duration).sort((a, b) => a - b);
     audioLoaded = true; loadedId = readyJob.id; loadingId = null;
+    setRepeatBounds(0, duration); updateLoopControls();
     $('seek').max = String(duration); $('seek').disabled = false; $('play').disabled = false;
     $('total-time').textContent = formatTime(duration);
     $('audio-status').textContent = '재생을 누르면 네 파트가 함께 시작해요.';
@@ -422,6 +436,27 @@ function applyGains() {
     $(`value-${stem}`).textContent = `${Math.round(volumes[stem] * 100)}%`;
   }
 }
+function setRepeatBounds(start, end) {
+  if (!(duration > 0)) return;
+  const minimum = Math.min(1, duration);
+  repeatStart = Math.max(0, Math.min(Number(start) || 0, duration - minimum));
+  repeatEnd = Math.max(repeatStart + minimum, Math.min(Number(end) || 0, duration));
+  $('loop-start').max = String(duration - minimum); $('loop-start').value = String(repeatStart);
+  $('loop-end').max = String(duration); $('loop-end').value = String(repeatEnd);
+  $('loop-label').textContent = `${formatTime(repeatStart)} – ${formatTime(repeatEnd)}`;
+}
+function updateLoopControls() {
+  document.querySelectorAll('[data-loop-mode]').forEach((button) => {
+    const selected = button.dataset.loopMode === loopMode;
+    button.classList.toggle('selected', selected); button.setAttribute('aria-pressed', String(selected));
+  });
+  $('loop-section').hidden = loopMode !== 'section';
+  for (const id of ['loop-start', 'loop-end', 'loop-start-current', 'loop-end-current']) $(id).disabled = !audioLoaded;
+}
+function selectLoopMode(mode) {
+  const wasPlaying = playing; pause(); loopMode = mode; $('loop').checked = true; updateLoopControls();
+  if (wasPlaying) play().catch((error) => showError('audio-error', errorText(error)));
+}
 function setMode(mode) {
   for (const stem of STEMS) muted[stem] = !MODES[mode].includes(stem);
   document.querySelectorAll('[data-mode]').forEach((button) => {
@@ -437,7 +472,11 @@ async function play() {
   const context = audioContext();
   await context.resume();
   if (generation !== playbackGeneration || !audioLoaded) return;
-  if (offset >= duration - 0.005) offset = 0;
+  playbackLoop = $('loop').checked;
+  playbackStart = playbackLoop && loopMode === 'section' ? repeatStart : 0;
+  playbackEnd = playbackLoop && loopMode === 'section' ? repeatEnd : duration;
+  if (playbackLoop && (offset < playbackStart || offset >= playbackEnd - 0.005)) offset = playbackStart;
+  else if (offset >= duration - 0.005) offset = 0;
   const index = Math.min(chunkCount - 1, Math.floor(offset / chunkSeconds));
   const within = offset - index * chunkSeconds;
   abortChunkLoadsExcept(index);
@@ -445,47 +484,54 @@ async function play() {
   const chunk = await getChunk(index);
   if (generation !== playbackGeneration || !audioLoaded) return;
   startedAt = context.currentTime + 0.04;
-  playbackLoop = $('loop').checked;
   for (const stem of STEMS) {
     const gain = context.createGain(); gain.gain.value = muted[stem] ? 0 : volumes[stem];
     gain.connect(master); gains[stem] = gain;
   }
   playing = true;
-  scheduleChunk(index, chunk, startedAt, within, generation);
-  scheduleNext(index + 1, startedAt + chunk.length - within, generation);
+  const piece = scheduleChunk(index, chunk, startedAt, within, generation);
+  scheduleNext(piece.end, startedAt + piece.length, generation);
   $('play').textContent = 'Ⅱ'; $('play').setAttribute('aria-label', '일시정지');
   $('audio-status').textContent = '로컬에서 재생 중 · 네 파트 동기 재생';
 }
 
 function scheduleChunk(index, chunk, at, within, generation) {
+  const chunkStart = index * chunkSeconds;
+  const end = Math.min(chunkStart + chunkSeconds, playbackLoop ? playbackEnd : duration, duration);
+  const length = Math.min(end - chunkStart - within, chunk.length - within);
+  if (!(length > 0)) throw new Error('반복 구간이 올바르지 않아요.');
   for (const stem of STEMS) {
     const node = ctx.createBufferSource(); node.buffer = chunk.buffers[stem];
     node.connect(gains[stem]); nodes.push(node);
     node.onended = () => {
       node.disconnect(); nodes = nodes.filter((item) => item !== node);
-      if (stem === 'other' && index === chunkCount - 1 && !playbackLoop && generation === playbackGeneration) {
+      if (stem === 'other' && end >= duration - 0.001 && !playbackLoop && generation === playbackGeneration) {
         offset = duration; stopSources(); $('audio-status').textContent = '재생이 끝났어요.';
       }
     };
-    node.start(at, within); node.stop(at + chunk.length - within);
+    node.start(at, within, length); node.stop(at + length);
   }
+  return { end, length };
 }
 
-function scheduleNext(index, at, generation) {
+function scheduleNext(songPosition, at, generation) {
   if (!playing || generation !== playbackGeneration) return;
-  if (index >= chunkCount) { if (!playbackLoop) return; index = 0; }
+  if (playbackLoop && songPosition >= playbackEnd - 0.001) songPosition = playbackStart;
+  else if (!playbackLoop && songPosition >= duration - 0.001) return;
+  const index = Math.min(chunkCount - 1, Math.floor(songPosition / chunkSeconds));
+  const within = songPosition - index * chunkSeconds;
   const delay = Math.max(0, (at - ctx.currentTime - 12) * 1000);
   scheduleTimer = setTimeout(async () => {
     try {
       const chunk = await getChunk(index);
       if (!playing || generation !== playbackGeneration) return;
       if (ctx.currentTime >= at - 0.02) {
-        pause(); offset = index * chunkSeconds;
+        pause(); offset = songPosition;
         $('audio-status').textContent = '다음 부분을 준비하고 있어요…';
         await play(); return;
       }
-      scheduleChunk(index, chunk, at, 0, generation);
-      scheduleNext(index + 1, at + chunk.length, generation);
+      const piece = scheduleChunk(index, chunk, at, within, generation);
+      scheduleNext(piece.end, at + piece.length, generation);
     } catch (error) {
       if (generation !== playbackGeneration) return;
       pause(); $('audio-status').textContent = '재생을 멈췄어요.'; showError('audio-error', errorText(error));
@@ -506,53 +552,54 @@ function buildMixer() {
     container.append(header, slider, output); $('stem-mixer').append(container);
   }
 }
+function loadPadBytes() {
+  if (!padBytesPromise) {
+    padBytesPromise = Promise.all(Object.entries(PAD_SAMPLES).map(async ([kind, sample]) => {
+      const response = await fetch(`/samples/${sample.file}`, { cache: 'force-cache', credentials: 'same-origin' });
+      if (!response.ok) throw new Error(`${kind} 드럼 소리를 불러오지 못했어요.`);
+      return [kind, await response.arrayBuffer()];
+    })).then(Object.fromEntries).catch((error) => { padBytesPromise = null; throw error; });
+  }
+  return padBytesPromise;
+}
+
+function preparePadBuffers(context) {
+  if (!padBuffersPromise) {
+    padBuffersPromise = loadPadBytes().then(async (bytes) => Object.fromEntries(await Promise.all(
+      Object.entries(bytes).map(async ([kind, data]) => [kind, await context.decodeAudioData(data)]),
+    ))).catch((error) => { padBuffersPromise = null; padBytesPromise = null; throw error; });
+  }
+  return padBuffersPromise;
+}
+
 async function hitPad(kind) {
   const button = $(`${kind}-pad`);
   button.classList.add('hit'); setTimeout(() => button.classList.remove('hit'), 110);
   try {
-    const context = audioContext(); await context.resume();
+    const context = audioContext();
+    const resumed = context.resume(); // Start the unlock during the user's gesture.
+    const buffers = await preparePadBuffers(context); await resumed;
+    if (document.hidden) return;
     const at = context.currentTime;
-    const envelope = context.createGain(); envelope.connect(master);
-    if (kind === 'kick' || kind === 'tom') {
-      const oscillator = context.createOscillator(); oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(kind === 'kick' ? 145 : 220, at);
-      oscillator.frequency.exponentialRampToValueAtTime(kind === 'kick' ? 48 : 92, at + (kind === 'kick' ? 0.11 : 0.17));
-      envelope.gain.setValueAtTime(0.0001, at); envelope.gain.exponentialRampToValueAtTime(kind === 'kick' ? 0.9 : 0.6, at + 0.004); envelope.gain.exponentialRampToValueAtTime(0.0001, at + 0.28);
-      oscillator.connect(envelope); oscillator.start(at); oscillator.stop(at + 0.3); oscillator.onended = () => { oscillator.disconnect(); envelope.disconnect(); };
-    } else {
-      if (!noiseBuffer) {
-        noiseBuffer = context.createBuffer(1, Math.ceil(context.sampleRate * 1.3), context.sampleRate);
-        const samples = noiseBuffer.getChannelData(0); for (let index = 0; index < samples.length; index++) samples[index] = Math.random() * 2 - 1;
-      }
-      if ((kind === 'hat' || kind === 'open-hat') && openHatVoice) {
-        openHatVoice.envelope.gain.cancelScheduledValues(at);
-        openHatVoice.envelope.gain.setValueAtTime(Math.max(openHatVoice.envelope.gain.value, 0.001), at);
-        openHatVoice.envelope.gain.exponentialRampToValueAtTime(0.0001, at + 0.025);
-        try { openHatVoice.noise.stop(at + 0.03); } catch { /* A previous hit already ended. */ }
-        openHatVoice = null;
-      }
-      const noise = context.createBufferSource(); noise.buffer = noiseBuffer;
-      const filter = context.createBiquadFilter(); filter.type = 'highpass';
-      filter.frequency.value = kind === 'snare' ? 1200 : kind === 'crash' ? 3500 : 6500;
-      const length = kind === 'snare' ? 0.18 : kind === 'hat' ? 0.075 : kind === 'open-hat' ? 0.55 : 1.2;
-      envelope.gain.setValueAtTime(kind === 'snare' ? 0.5 : kind === 'crash' ? 0.25 : 0.28, at);
-      envelope.gain.exponentialRampToValueAtTime(0.0001, at + length - 0.01);
-      noise.connect(filter); filter.connect(envelope); noise.start(at); noise.stop(at + length);
-      if (kind === 'open-hat') openHatVoice = { noise, envelope };
-      noise.onended = () => { if (openHatVoice?.noise === noise) openHatVoice = null; noise.disconnect(); filter.disconnect(); envelope.disconnect(); };
-      if (kind === 'snare') {
-        const tone = context.createOscillator(); const toneGain = context.createGain(); tone.frequency.value = 185;
-        toneGain.gain.setValueAtTime(0.17, at); toneGain.gain.exponentialRampToValueAtTime(0.0001, at + 0.1);
-        tone.connect(toneGain); toneGain.connect(master); tone.start(at); tone.stop(at + 0.11);
-        tone.onended = () => { tone.disconnect(); toneGain.disconnect(); };
-      } else {
-        for (const frequency of [4200, 5600, 7100]) {
-          const tone = context.createOscillator(); const toneGain = context.createGain(); tone.type = 'square'; tone.frequency.value = frequency;
-          toneGain.gain.value = 0.035; tone.connect(toneGain); toneGain.connect(filter); tone.start(at); tone.stop(at + length);
-          tone.onended = () => { tone.disconnect(); toneGain.disconnect(); };
-        }
-      }
+    if ((kind === 'hat' || kind === 'open-hat') && openHatVoice) {
+      openHatVoice.gain.gain.cancelScheduledValues(at);
+      openHatVoice.gain.gain.setValueAtTime(Math.max(openHatVoice.gain.gain.value, 0.001), at);
+      openHatVoice.gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.025);
+      try { openHatVoice.node.stop(at + 0.03); } catch { /* A previous hit already ended. */ }
+      openHatVoice = null;
     }
+    const sample = PAD_SAMPLES[kind], buffer = buffers[kind];
+    const start = Math.min(sample.offset, Math.max(0, buffer.duration - 0.001));
+    const length = Math.min(sample.length, buffer.duration - start);
+    if (!(length > 0)) throw new Error('드럼 소리 길이가 올바르지 않아요.');
+    const voice = context.createBufferSource(), gain = context.createGain();
+    voice.buffer = buffer; voice.connect(gain); gain.connect(padMaster);
+    gain.gain.setValueAtTime(sample.gain, at);
+    gain.gain.setValueAtTime(sample.gain, at + Math.max(0, length - 0.08));
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + length);
+    voice.start(at, start, length);
+    if (kind === 'open-hat') openHatVoice = { node: voice, gain };
+    voice.onended = () => { if (openHatVoice?.node === voice) openHatVoice = null; voice.disconnect(); gain.disconnect(); };
     $('pad-status').textContent = 'D 킥 · F 스네어 · S 톰 · J 닫힌 하이햇 · K 열린 하이햇 · L 크래시';
   } catch (error) { $('pad-status').textContent = errorText(error); }
 }
@@ -577,7 +624,10 @@ function drawGuide() {
     }
   };
   drawRange(Math.max(0, now - 2.2), now + 6.2);
-  if ($('loop').checked && duration > 0 && now > duration - 6.2) drawRange(0, Math.max(0, now + 6.2 - duration), duration);
+  const loopFrom = loopMode === 'section' ? repeatStart : 0, loopTo = loopMode === 'section' ? repeatEnd : duration;
+  if ($('loop').checked && loopTo > loopFrom && now >= loopFrom && now < loopTo && now > loopTo - 6.2) {
+    drawRange(loopFrom, Math.min(loopTo, loopFrom + now + 6.2 - loopTo), loopTo - loopFrom);
+  }
   $('elapsed').textContent = formatTime(now);
   if (document.activeElement !== $('seek')) $('seek').value = String(now);
 }
@@ -586,6 +636,9 @@ function animate() { drawGuide(); requestAnimationFrame(animate); }
 buildMixer();
 selectSource('file');
 selectRange('full');
+updateLoopControls();
+try { preparePadBuffers(audioContext()).catch((error) => { $('pad-status').textContent = errorText(error); }); }
+catch (error) { $('pad-status').textContent = errorText(error); }
 $('source-form').addEventListener('submit', submitJob);
 document.querySelectorAll('[data-source]').forEach((button) => button.addEventListener('click', () => selectSource(button.dataset.source)));
 document.querySelectorAll('[data-range]').forEach((button) => button.addEventListener('click', () => selectRange(button.dataset.range)));
@@ -622,13 +675,44 @@ $('seek').addEventListener('change', () => {
   if (resumeAfterSeek) play().catch((error) => showError('audio-error', errorText(error)));
   resumeAfterSeek = false;
 });
-$('loop').addEventListener('change', () => { if (playing) { pause(); play().catch((error) => showError('audio-error', errorText(error))); } });
+$('loop').addEventListener('change', () => {
+  const wasPlaying = playing; pause(); updateLoopControls();
+  if (wasPlaying) play().catch((error) => showError('audio-error', errorText(error)));
+});
+document.querySelectorAll('[data-loop-mode]').forEach((button) => button.addEventListener('click', () => selectLoopMode(button.dataset.loopMode)));
+for (const id of ['loop-start', 'loop-end']) {
+  $(id).addEventListener('input', () => {
+    if (!loopEditing) { loopEditing = true; resumeAfterLoop = playing; pause(); }
+    const start = Number($('loop-start').value), end = Number($('loop-end').value);
+    if (id === 'loop-start') setRepeatBounds(start, Math.max(start + 1, end));
+    else setRepeatBounds(Math.min(start, end - 1), end);
+  });
+  $(id).addEventListener('change', () => {
+    if (!loopEditing) return;
+    loopEditing = false;
+    if (resumeAfterLoop) play().catch((error) => showError('audio-error', errorText(error)));
+    resumeAfterLoop = false;
+  });
+}
+$('loop-start-current').addEventListener('click', () => {
+  const now = position(), wasPlaying = playing; pause(); setRepeatBounds(now, Math.max(now + 1, repeatEnd));
+  if (wasPlaying) play().catch((error) => showError('audio-error', errorText(error)));
+});
+$('loop-end-current').addEventListener('click', () => {
+  const now = position(), wasPlaying = playing; pause(); setRepeatBounds(Math.min(repeatStart, now - 1), now);
+  if (wasPlaying) play().catch((error) => showError('audio-error', errorText(error)));
+});
 document.querySelectorAll('[data-mode]').forEach((button) => button.addEventListener('click', () => setMode(button.dataset.mode)));
 for (const kind of Object.values(PAD_KEYS)) {
   const button = $(`${kind}-pad`);
   button.addEventListener('pointerdown', (event) => { if (event.button === 0) { event.preventDefault(); button.focus(); hitPad(kind); } });
   button.addEventListener('click', (event) => { if (event.detail === 0) hitPad(kind); });
 }
+$('pad-volume').addEventListener('input', () => {
+  const value = Math.max(0, Math.min(1, Number($('pad-volume').value)));
+  $('pad-volume-value').textContent = `${Math.round(value * 100)}%`;
+  if (padMaster && ctx) padMaster.gain.setTargetAtTime(value, ctx.currentTime, 0.015);
+});
 document.addEventListener('keydown', (event) => {
   if (event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.target.closest('input,textarea,select,[contenteditable=true]')) return;
   const kind = PAD_KEYS[event.code];

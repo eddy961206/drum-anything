@@ -24,13 +24,14 @@ async function fixture(overrides = {}) {
   }
   for (const id of ids) elements.set(id, new Element(id));
   elements.get('loop').checked = true;
+  elements.get('pad-volume').value = '0.8';
   elements.get('excerpt-start').value = '0';
   elements.get('excerpt-duration').value = '60';
   const group = (key, values) => values.map((value) => { const element = new Element(); element.dataset[key] = value; return element; });
-  const groups = { '[data-source]': group('source', ['file', 'youtube']), '[data-range]': group('range', ['full', 'excerpt']), '[data-mode]': group('mode', ['all', 'vocals', 'instrumental', 'drummer']), '[data-stage]': group('stage', ['acquiring', 'normalizing', 'separating', 'analyzing', 'ready']) };
+  const groups = { '[data-source]': group('source', ['file', 'youtube']), '[data-range]': group('range', ['full', 'excerpt']), '[data-loop-mode]': group('loopMode', ['full', 'section']), '[data-mode]': group('mode', ['all', 'vocals', 'instrumental', 'drummer']), '[data-stage]': group('stage', ['acquiring', 'normalizing', 'separating', 'analyzing', 'ready']) };
   const param = () => ({ value: 0, setValueAtTime(value) { this.value = value; }, setTargetAtTime(value) { this.value = value; }, exponentialRampToValueAtTime() {}, cancelScheduledValues() {} });
   const node = () => ({ connect() {}, disconnect() {}, gain: param() });
-  const audio = { context: null, nodes: [], downloads: 0, duration: 3, started: 0 };
+  const audio = { context: null, nodes: [], downloads: 0, sampleDownloads: 0, duration: 3, started: 0 };
   class AudioContext {
     constructor() { this.currentTime = 0; this.destination = {}; this.sampleRate = 44100; audio.context = this; }
     createGain() { return node(); }
@@ -50,6 +51,7 @@ async function fixture(overrides = {}) {
       requests.push({ url, options });
       if (url === '/api/session') return { ok: true, json: async () => session };
       if (url === '/api/jobs') return { ok: true, json: async () => ({ id: 'submitted', status: 'queued' }) };
+      if (String(url).startsWith('/samples/')) { audio.sampleDownloads += 1; return { ok: true, arrayBuffer: async () => new ArrayBuffer(2) }; }
       audio.downloads += 1;
       const index = Number(String(url).match(/\/chunks\/(\d+)\//)?.[1] || 0);
       return { ok: true, arrayBuffer: async () => { const data = new ArrayBuffer(2); data.fakeDuration = Math.min(20, audio.duration - index * 20); return data; } };
@@ -142,6 +144,17 @@ test('long audio schedules the next four chunks on the same clock and bounds cac
   await f.run('getChunk(2)'); await f.run('getChunk(3)');
   assert(f.run('chunkCache.size') <= 3);
 });
+test('a selected loop crosses a chunk boundary and returns to its chosen start', async () => {
+  const f = await fixture(); await ready(f, 61);
+  f.run("selectLoopMode('section'); setRepeatBounds(15, 23); offset = 15");
+  await f.run('play()');
+  assert(f.audio.nodes.slice(0, 4).every((node) => node.startArgs[1] === 15 && Math.abs(node.stopAt - 5.04) < 0.001));
+  const first = f.timers.find((item) => item.milliseconds === 0); await first.callback();
+  assert(f.audio.nodes.slice(4, 8).every((node) => Math.abs(node.startArgs[0] - 5.04) < 0.001 && node.startArgs[1] === 0 && Math.abs(node.stopAt - 8.04) < 0.001));
+  const next = f.timers.filter((item) => item.milliseconds === 0).at(-1); await next.callback();
+  assert(f.audio.nodes.slice(8, 12).every((node) => Math.abs(node.startArgs[0] - 8.04) < 0.001 && node.startArgs[1] === 15));
+  f.audio.context.currentTime = 10.04; assert(Math.abs(f.run('position()') - 17) < 0.001);
+});
 test('pausing while a chunk loads cancels it and cannot start stale audio', async () => {
   const f = await fixture(); await ready(f, 61); await f.run('play()');
   const timer = f.timers.find((item) => item.milliseconds > 8000 && item.milliseconds < 8100);
@@ -161,9 +174,16 @@ test('all six drum pads create sound voices and closed hat stops the open hat', 
     assert(f.audio.started > before, `${pad} did not start an audio voice`);
   }
   await f.run("hitPad('open-hat')");
-  const open = f.run('openHatVoice.noise');
+  const open = f.run('openHatVoice.node');
   await f.run("hitPad('hat')");
   assert.equal(f.run('openHatVoice'), null); assert(open.stopAt < 0.1);
+});
+test('pad volume changes the drum bus independently of the stem mixer', async () => {
+  const f = await fixture();
+  f.elements.get('pad-volume').value = '0.3'; f.elements.get('pad-volume').listeners.input();
+  assert.equal(f.run('padMaster.gain.value'), 0.3);
+  assert.equal(f.elements.get('pad-volume-value').textContent, '30%');
+  assert.equal(f.run('volumes.vocals'), 0.8);
 });
 test('live mode gain changes and pause/resume preserve alignment', async () => {
   const f = await fixture(); await ready(f); await f.run('play()'); f.audio.context.currentTime = 1.04;

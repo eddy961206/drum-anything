@@ -704,6 +704,9 @@ class Handler(BaseHTTPRequestHandler):
                     if job.status != 'ready':
                         raise Problem('Audio is not ready.')
                     self.chunk_response(safe_child(job.directory, filename), int(index))
+            elif path in {f'/samples/{name}.m4a' for name in ('kick', 'snare', 'hat', 'open-hat', 'crash')} | {'/samples/tom.flac'}:
+                filename = path.rsplit('/', 1)[1]
+                self.file_response(STATIC / 'samples' / filename, 'audio/flac' if filename.endswith('.flac') else 'audio/mp4')
             elif path in ('/', '/index.html', '/app.js', '/style.css'):
                 name = 'index.html' if path == '/' else path[1:]
                 mime = {'index.html': 'text/html; charset=utf-8', 'app.js': 'text/javascript; charset=utf-8', 'style.css': 'text/css; charset=utf-8'}[name]

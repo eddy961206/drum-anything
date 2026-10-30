@@ -536,6 +536,14 @@ class HTTPChecks(unittest.TestCase):
         self.assertEqual(self.request('GET', f'/media/{job.id}/chunks/1/drums.wav')[0], 400)
         self.manager.delete(job.id)
 
+    def test_drum_samples_are_local_and_not_available_from_preview_origin(self):
+        for name in ('kick.m4a', 'snare.m4a', 'tom.flac', 'hat.m4a', 'open-hat.m4a', 'crash.m4a'):
+            status, headers, data = self.request('GET', '/samples/' + name)
+            self.assertEqual(status, 200)
+            self.assertTrue(headers['Content-Type'].startswith('audio/'))
+            self.assertGreater(len(data), 1000)
+            self.assertEqual(self.request('GET', '/samples/' + name, headers={'Host': f'localhost:{self.server.server_port}'})[0], 404)
+
     def test_invalid_host_origin_and_site_are_rejected(self):
         for headers in ({'Host': 'evil.test'}, {'Origin': 'https://evil.test'},
                         {'Origin': 'null'}, {'Sec-Fetch-Site': 'cross-site'}, {'Sec-Fetch-Site': 'same-site'}):

@@ -2,7 +2,7 @@
 
 ## 현재 변경 검증 범위
 
-아래 Linux 8초 검증은 이전 구현의 기록이다. 전체 곡 분할 처리, float 출력과 공통 볼륨 보정은 별도로 실제 모델 검증이 필요하다. Windows에서 합성 51초 입력과 모의 모델로 조각 연결 길이를 확인했고, 65초 합성 스템으로 브라우저의 조각 경계·탐색·반복을 확인했다.
+아래 Linux 8초 검증은 이전 구현의 기록이다. 전체 곡 분할 처리, float 출력과 공통 볼륨 보정은 별도로 실제 모델 검증이 필요하다. Windows에서 합성 51초 입력과 모의 모델로 조각 연결을 확인했다. 브라우저에서 65초 합성 스템으로 조각 경계·탐색·전체 반복·19–23초 구간 반복을 확인했다. 여섯 CC0 드럼 파일을 브라우저가 디코딩하고 패드 입력에 반응하는 것을 확인했다. 실제 청감은 확인하지 못했다.
 
 ## Automated regression checks
 
@@ -77,4 +77,4 @@ The harness verified `ready`, retrieved all four WAVs over HTTP, confirmed only 
 
 ## Publication boundary
 
-Only source/docs/tests listed in `SOURCE_MANIFEST.json` are published. Virtual environments, model weights, binaries, generated audio, caches, detailed execution reports, credentials and bytecode are excluded. No project license has been selected; external dependency/model/music rights remain separate.
+Only files listed in `SOURCE_MANIFEST.json` are published, including six attributed CC0 drum recordings. Virtual environments, model weights, executables, user music, generated stems, caches, detailed execution reports, credentials and bytecode are excluded. No project license has been selected; external dependency/model/music rights remain separate.

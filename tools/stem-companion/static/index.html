@@ -57,6 +57,15 @@
         <div class="section-heading"><h2 id="player-heading">2. 내 리듬으로 연주하기</h2><span id="audio-status">네 파트를 불러오고 있어요.</span></div>
         <p id="audio-error" class="notice error" role="alert" hidden></p>
         <div class="transport"><button id="play" class="play-button" type="button" disabled aria-label="재생">▶</button><div class="track-timeline"><div class="timeline-label"><strong>내 연습 구간</strong><span><output id="elapsed">0:00</output> / <span id="total-time">0:00</span></span></div><label class="sr-only" for="seek">재생 위치</label><input type="range" id="seek" min="0" max="1" value="0" step="0.01" disabled></div><label class="loop-control"><input type="checkbox" id="loop" checked> 반복</label></div>
+        <div class="loop-settings">
+          <div class="loop-mode" role="group" aria-label="반복 범위"><span>반복 범위</span><button type="button" data-loop-mode="full" class="selected" aria-pressed="true">전체 곡</button><button type="button" data-loop-mode="section" aria-pressed="false">구간 지정</button></div>
+          <div id="loop-section" class="loop-section" hidden>
+            <div class="selection-heading"><strong>계속 반복할 부분</strong><output id="loop-label">0:00 – 0:00</output></div>
+            <label for="loop-start">반복 시작 <input type="range" id="loop-start" min="0" max="1" value="0" step="0.1"></label>
+            <label for="loop-end">반복 끝 <input type="range" id="loop-end" min="0" max="1" value="1" step="0.1"></label>
+            <div class="selection-actions"><button type="button" id="loop-start-current">현재 위치를 시작으로</button><button type="button" id="loop-end-current">현재 위치를 끝으로</button></div>
+          </div>
+        </div>
         <div class="mix-modes" role="group" aria-label="파트 조합"><button type="button" data-mode="all" class="selected" aria-pressed="true">전체 듣기</button><button type="button" data-mode="vocals" aria-pressed="false">보컬만</button><button type="button" data-mode="instrumental" aria-pressed="false">반주만</button><button type="button" data-mode="drummer" aria-pressed="false">내가 드러머 <span>원래 드럼 끄기</span></button></div>
         <div class="stem-mixer" id="stem-mixer"></div>
         <div class="guide-heading"><div><h3>드럼 타이밍 힌트</h3><p>분리된 드럼의 에너지 변화를 바탕으로 추정해요. 정확한 악보나 악기 구분은 아니에요.</p></div><span id="onset-count"></span></div>
@@ -65,7 +74,7 @@
         <div id="stem-downloads" class="stem-downloads" aria-label="분리된 WAV 파일 저장"></div>
       </section>
       <section class="pads-section" aria-labelledby="pads-heading">
-        <div class="pads-heading"><h2 id="pads-heading">리듬은, 내 손끝에서.</h2><p>키보드 또는 터치로 언제든 자유롭게 연주해요.</p></div>
+        <div class="pads-heading"><h2 id="pads-heading">리듬은, 내 손끝에서.</h2><p>키보드 또는 터치로 언제든 자유롭게 연주해요.</p><label class="pad-volume" for="pad-volume">드럼 패드 음량 <input id="pad-volume" type="range" min="0" max="1" step="0.01" value="0.8"><output id="pad-volume-value" for="pad-volume">80%</output></label></div>
         <div class="pads">
           <button type="button" class="pad kick" id="kick-pad" aria-label="킥 드럼, D 키"><span class="pad-instrument" aria-hidden="true">◎</span><strong>Kick</strong><span>킥</span><kbd>D</kbd></button>
           <button type="button" class="pad snare" id="snare-pad" aria-label="스네어 드럼, F 키"><span class="pad-instrument" aria-hidden="true">≋</span><strong>Snare</strong><span>스네어</span><kbd>F</kbd></button>
@@ -74,7 +83,7 @@
           <button type="button" class="pad open-hat" id="open-hat-pad" aria-label="열린 하이햇, K 키"><span class="pad-instrument" aria-hidden="true">≈</span><strong>Open hat</strong><span>열린 하이햇</span><kbd>K</kbd></button>
           <button type="button" class="pad crash" id="crash-pad" aria-label="크래시 심벌, L 키"><span class="pad-instrument" aria-hidden="true">✳</span><strong>Crash</strong><span>크래시</span><kbd>L</kbd></button>
         </div>
-        <p class="pad-note" id="pad-status" role="status">합성 드럼 소리예요. 작은 볼륨으로 시작해요.</p>
+        <p class="pad-note" id="pad-status" role="status">실제 드럼 녹음으로 만든 패드예요. 작은 볼륨으로 시작해요.</p>
       </section>
     </main>
     <footer><span>음원과 결과물은 로컬 캐시에 저장돼요. 필요 없어진 작업은 위에서 삭제해 주세요.</span><span>Local Stem Companion · 실행 중에만 연결됨</span></footer>
