@@ -35,7 +35,7 @@ python3 -m http.server 4173 --directory apps/doongtak/dist
 
 The companion runs separately on your own computer, not inside a hosted frontend. It requires external tools for permitted public-URL acquisition or local-file processing and four-stem separation. Six CC0 drum recordings are bundled; model weights, executables, and user songs are not. Model downloads require an explicit choice. It does not provide cookies, account access, DRM/paywall/region bypass, or a workaround for blocked acquisition.
 
-**상태 / Status:** 이전 구현에서 Windows의 실제 YouTube 영상 30초 분리를 확인했습니다. 전체 곡 처리의 실제 모델 검증과 청감 확인은 진행 중입니다. / A previous version separated 30 seconds of a real YouTube video on Windows; real-model verification of the full-song path and listening quality remain in progress. See the companion README for setup, rights, model-license limitations, and cleanup.
+**상태 / Status:** Windows에서 실제 YouTube 영상 3분 24초 전체를 네 파트로 분리하고 브라우저의 구간 반복을 확인했습니다. 실제 청감과 분리 품질은 아직 확인하지 못했습니다. / On Windows, a 3:24 YouTube video was separated into four stems and section looping was checked in the browser. Listening quality and source-isolation quality remain unverified. See the companion README for setup, rights, model-license limitations, and cleanup.
 
 ## 확인 · Check
 

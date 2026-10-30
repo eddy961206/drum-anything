@@ -22,7 +22,7 @@ const previewOrigin = `${location.protocol}//localhost:${location.port}`;
 let loadedId = null, loadingId = null, loadGeneration = 0, loadController = null;
 let ctx = null, master = null, padMaster = null, nodes = [], gains = {}, duration = 0, offset = 0, startedAt = 0;
 let audioJob = null, chunkSeconds = 0, chunkCount = 0, chunkCache = new Map(), chunkLoads = new Map(), scheduleTimer = null;
-let playing = false, playbackLoop = true, playbackGeneration = 0, audioLoaded = false, onsets = [];
+let playing = false, starting = false, playbackLoop = true, playbackGeneration = 0, audioLoaded = false, onsets = [];
 let seeking = false, resumeAfterSeek = false;
 let loopMode = 'full', repeatStart = 0, repeatEnd = 0, playbackStart = 0, playbackEnd = 0;
 let loopEditing = false, resumeAfterLoop = false;
@@ -340,7 +340,7 @@ function stopSources() {
   for (const node of nodes) { node.onended = null; try { node.stop(); } catch { /* Already ended. */ } node.disconnect(); }
   for (const gain of Object.values(gains)) gain.disconnect();
   nodes = []; gains = {};
-  playing = false;
+  playing = false; starting = false;
   $('play').textContent = '▶'; $('play').setAttribute('aria-label', '재생');
 }
 function pause() { offset = position(); stopSources(); }
@@ -454,7 +454,7 @@ function updateLoopControls() {
   for (const id of ['loop-start', 'loop-end', 'loop-start-current', 'loop-end-current']) $(id).disabled = !audioLoaded;
 }
 function selectLoopMode(mode) {
-  const wasPlaying = playing; pause(); loopMode = mode; $('loop').checked = true; updateLoopControls();
+  const wasPlaying = playing || starting; pause(); loopMode = mode; $('loop').checked = true; updateLoopControls();
   if (wasPlaying) play().catch((error) => showError('audio-error', errorText(error)));
 }
 function setMode(mode) {
@@ -466,33 +466,41 @@ function setMode(mode) {
 }
 function clearMode() { document.querySelectorAll('[data-mode]').forEach((button) => { button.classList.remove('selected'); button.setAttribute('aria-pressed', 'false'); }); }
 async function play() {
-  if (!audioLoaded || playing) return;
+  if (!audioLoaded || playing || starting) return;
   if (previewReady) $('youtube-preview').contentWindow.postMessage({ type: 'pause', request: previewRequest }, previewOrigin);
   const generation = ++playbackGeneration;
-  const context = audioContext();
-  await context.resume();
-  if (generation !== playbackGeneration || !audioLoaded) return;
-  playbackLoop = $('loop').checked;
-  playbackStart = playbackLoop && loopMode === 'section' ? repeatStart : 0;
-  playbackEnd = playbackLoop && loopMode === 'section' ? repeatEnd : duration;
-  if (playbackLoop && (offset < playbackStart || offset >= playbackEnd - 0.005)) offset = playbackStart;
-  else if (offset >= duration - 0.005) offset = 0;
-  const index = Math.min(chunkCount - 1, Math.floor(offset / chunkSeconds));
-  const within = offset - index * chunkSeconds;
-  abortChunkLoadsExcept(index);
-  $('audio-status').textContent = '재생할 부분을 준비하고 있어요…';
-  const chunk = await getChunk(index);
-  if (generation !== playbackGeneration || !audioLoaded) return;
-  startedAt = context.currentTime + 0.04;
-  for (const stem of STEMS) {
-    const gain = context.createGain(); gain.gain.value = muted[stem] ? 0 : volumes[stem];
-    gain.connect(master); gains[stem] = gain;
-  }
-  playing = true;
-  const piece = scheduleChunk(index, chunk, startedAt, within, generation);
-  scheduleNext(piece.end, startedAt + piece.length, generation);
+  starting = true;
   $('play').textContent = 'Ⅱ'; $('play').setAttribute('aria-label', '일시정지');
-  $('audio-status').textContent = '로컬에서 재생 중 · 네 파트 동기 재생';
+  $('audio-status').textContent = '재생할 부분을 준비하고 있어요…';
+  try {
+    const context = audioContext();
+    await context.resume();
+    if (generation !== playbackGeneration || !audioLoaded) return;
+    playbackLoop = $('loop').checked;
+    playbackStart = playbackLoop && loopMode === 'section' ? repeatStart : 0;
+    playbackEnd = playbackLoop && loopMode === 'section' ? repeatEnd : duration;
+    if (playbackLoop && (offset < playbackStart || offset >= playbackEnd - 0.005)) offset = playbackStart;
+    else if (offset >= duration - 0.005) offset = 0;
+    const index = Math.min(chunkCount - 1, Math.floor(offset / chunkSeconds));
+    const within = offset - index * chunkSeconds;
+    abortChunkLoadsExcept(index);
+    const chunk = await getChunk(index);
+    if (generation !== playbackGeneration || !audioLoaded) return;
+    startedAt = context.currentTime + 0.04;
+    for (const stem of STEMS) {
+      const gain = context.createGain(); gain.gain.value = muted[stem] ? 0 : volumes[stem];
+      gain.connect(master); gains[stem] = gain;
+    }
+    starting = false; playing = true;
+    const piece = scheduleChunk(index, chunk, startedAt, within, generation);
+    scheduleNext(piece.end, startedAt + piece.length, generation);
+    $('audio-status').textContent = '로컬에서 재생 중 · 네 파트 동기 재생';
+  } catch (error) {
+    if (generation !== playbackGeneration) return;
+    stopSources();
+    $('audio-status').textContent = '재생을 멈췄어요.';
+    throw error;
+  }
 }
 
 function scheduleChunk(index, chunk, at, within, generation) {
@@ -661,11 +669,11 @@ $('preview-selection').addEventListener('click', () => {
 $('cancel-job').addEventListener('click', cancelJob);
 $('delete-job').addEventListener('click', deleteJob);
 $('play').addEventListener('click', async () => {
-  try { if (playing) { pause(); $('audio-status').textContent = '일시정지'; } else await play(); }
+  try { if (playing || starting) { pause(); $('audio-status').textContent = '일시정지'; } else await play(); }
   catch (error) { showError('audio-error', errorText(error)); }
 });
 $('seek').addEventListener('input', () => {
-  if (!seeking) { seeking = true; resumeAfterSeek = playing; pause(); abortChunkLoadsExcept(); }
+  if (!seeking) { seeking = true; resumeAfterSeek = playing || starting; pause(); abortChunkLoadsExcept(); }
   offset = Math.min(duration, Math.max(0, Number($('seek').value)));
   $('elapsed').textContent = formatTime(offset);
 });
@@ -676,13 +684,13 @@ $('seek').addEventListener('change', () => {
   resumeAfterSeek = false;
 });
 $('loop').addEventListener('change', () => {
-  const wasPlaying = playing; pause(); updateLoopControls();
+  const wasPlaying = playing || starting; pause(); updateLoopControls();
   if (wasPlaying) play().catch((error) => showError('audio-error', errorText(error)));
 });
 document.querySelectorAll('[data-loop-mode]').forEach((button) => button.addEventListener('click', () => selectLoopMode(button.dataset.loopMode)));
 for (const id of ['loop-start', 'loop-end']) {
   $(id).addEventListener('input', () => {
-    if (!loopEditing) { loopEditing = true; resumeAfterLoop = playing; pause(); }
+    if (!loopEditing) { loopEditing = true; resumeAfterLoop = playing || starting; pause(); }
     const start = Number($('loop-start').value), end = Number($('loop-end').value);
     if (id === 'loop-start') setRepeatBounds(start, Math.max(start + 1, end));
     else setRepeatBounds(Math.min(start, end - 1), end);
@@ -695,11 +703,11 @@ for (const id of ['loop-start', 'loop-end']) {
   });
 }
 $('loop-start-current').addEventListener('click', () => {
-  const now = position(), wasPlaying = playing; pause(); setRepeatBounds(now, Math.max(now + 1, repeatEnd));
+  const now = position(), wasPlaying = playing || starting; pause(); setRepeatBounds(now, Math.max(now + 1, repeatEnd));
   if (wasPlaying) play().catch((error) => showError('audio-error', errorText(error)));
 });
 $('loop-end-current').addEventListener('click', () => {
-  const now = position(), wasPlaying = playing; pause(); setRepeatBounds(Math.min(repeatStart, now - 1), now);
+  const now = position(), wasPlaying = playing || starting; pause(); setRepeatBounds(Math.min(repeatStart, now - 1), now);
   if (wasPlaying) play().catch((error) => showError('audio-error', errorText(error)));
 });
 document.querySelectorAll('[data-mode]').forEach((button) => button.addEventListener('click', () => setMode(button.dataset.mode)));

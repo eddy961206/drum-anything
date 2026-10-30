@@ -167,6 +167,25 @@ test('pausing while a chunk loads cancels it and cannot start stale audio', asyn
   await pending;
   assert.equal(f.run('playing'), false); assert.equal(f.audio.nodes.length, 4);
 });
+test('changing loop mode while a seek loads keeps playback requested', async () => {
+  const f = await fixture(); await ready(f, 61); await f.run('play()');
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  f.context.fetch = async (url) => {
+    await gate;
+    const index = Number(String(url).match(/\/chunks\/(\d+)\//)[1]);
+    return { ok: true, arrayBuffer: async () => { const data = new ArrayBuffer(2); data.fakeDuration = Math.min(20, 61 - index * 20); return data; } };
+  };
+  const seek = f.elements.get('seek');
+  seek.value = '41'; seek.listeners.input(); seek.listeners.change();
+  await new Promise(setImmediate);
+  f.run("selectLoopMode('section')");
+  assert.equal(f.elements.get('play').attrs['aria-label'], '일시정지');
+  release(); await new Promise(setImmediate);
+  assert.equal(f.run('playing'), true);
+  assert.equal(f.audio.nodes.length, 8);
+  assert(f.audio.nodes.slice(4).every((node) => node.startArgs[1] === 1));
+});
 test('all six drum pads create sound voices and closed hat stops the open hat', async () => {
   const f = await fixture();
   for (const pad of ['kick', 'snare', 'tom', 'hat', 'open-hat', 'crash']) {
@@ -205,6 +224,14 @@ test('pause invalidates a pending audio resume to prevent stale playback', async
   f.audio.context.resume = () => new Promise((resolve) => { release = resolve; });
   const pending = f.run('play()'); f.run('pause()'); release(); await pending;
   assert.equal(f.run('playing'), false); assert.equal(f.audio.nodes.length, 0);
+});
+test('the pause button cancels playback while audio is starting', async () => {
+  const f = await fixture(); await ready(f); let release;
+  f.audio.context.resume = () => new Promise((resolve) => { release = resolve; });
+  const button = f.elements.get('play'), pending = button.listeners.click();
+  assert.equal(button.attrs['aria-label'], '일시정지');
+  await button.listeners.click(); release(); await pending;
+  assert.equal(button.attrs['aria-label'], '재생'); assert.equal(f.audio.nodes.length, 0);
 });
 test('bfcache pageshow refreshes session and resumes active job polling', async () => {
   const f = await fixture(); f.session.job = { id: 'abc', status: 'separating', message: 'fixture' }; f.run("renderJob({id:'abc',status:'separating'})");

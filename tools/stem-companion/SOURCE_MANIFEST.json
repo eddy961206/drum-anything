@@ -1,5 +1,5 @@
 {
-  "description": "Original local-only companion source; no audio, weights, binaries or credentials. Project license not selected.",
+  "description": "Original local-only companion source and attributed CC0 drum samples; no user music, generated stems, weights, executable binaries or credentials. Project license not selected.",
   "files": [
     {
       "path": ".gitignore",
@@ -8,13 +8,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 16596,
-      "sha256": "bca7fe3c1b2a40e4473f4ed6c3df6174add6dca820164ce68d2a879a383e676f"
+      "bytes": 16883,
+      "sha256": "5d570978fd86e0f3c325bee4b9c531f3e7b324748485afa81a12b06b736883df"
     },
     {
       "path": "VERIFICATION.md",
-      "bytes": 7617,
-      "sha256": "9cf0de8aa13b21839e39459c325fc55a4c385ac2fef1cda5cd2d59297ef31262"
+      "bytes": 9629,
+      "sha256": "2e9ab4c7f5c82e6608a7e76eaa2f16d6040efaa0065bd882740ac65e3616b883"
     },
     {
       "path": "companion.py",
@@ -28,8 +28,8 @@
     },
     {
       "path": "static/app.js",
-      "bytes": 44460,
-      "sha256": "6fee7a8d88cd7ab9e7975c7cd027692b0b116ba321fc81338149be3f1a45a0b9"
+      "bytes": 44855,
+      "sha256": "1fbbea7cc911aea88284c8dd9f0b837d4b20af405c4d193c128f4a573a23b901"
     },
     {
       "path": "static/style.css",
@@ -43,8 +43,8 @@
     },
     {
       "path": "tests/test_ui.cjs",
-      "bytes": 16958,
-      "sha256": "9e207dcf9009b46279bb3496e28e7b036d9700c367f01f939941e2d4b7022a4f"
+      "bytes": 18453,
+      "sha256": "e2025a6bf16516c47a859c60aa232a63b51443c0a63caa9a6b2773fada66cded"
     },
     {
       "path": "static/youtube-preview.html",
