@@ -15,7 +15,7 @@ const MODES = { all: STEMS, vocals: ['vocals'], instrumental: ['bass', 'drums', 
 const TERMINAL = new Set(['ready', 'failed', 'cancelled', 'dependency_missing']);
 const STAGES = ['acquiring', 'normalizing', 'separating', 'analyzing', 'ready'];
 const STATUS = { queued: '대기 중', acquiring: '가져오는 중', normalizing: '구간 정리 중', separating: '분리 중', analyzing: '분석 중', ready: '준비 완료', cancelled: '취소됨', failed: '실패', dependency_missing: '설치 / 모델 설정 필요' };
-let session = null, source = 'file', job = null, operation = false, pollTimer = null, pollGeneration = 0;
+let session = null, source = 'file', job = null, audioChoice = 'demo', operation = false, pollTimer = null, pollGeneration = 0;
 let rangeMode = 'full', previewId = '', previewRequest = 0, previewReady = false;
 let previewTime = 0, previewDuration = 0, previewTimer = null, selectionTouched = false;
 const previewOrigin = `${location.protocol}//localhost:${location.port}`;
@@ -69,7 +69,9 @@ function renderDependencies() {
   const available = source === 'youtube' ? (deps.youtube_ready ?? deps.ready) : deps.ready;
   const missing = [...(deps.missing || []), ...(source === 'youtube' ? (deps.youtube_missing || []) : [])];
   notice.className = `dependency-notice ${available ? 'ready' : 'missing'}`;
-  notice.textContent = available ? '실행 환경 준비 완료. 파일은 이 컴퓨터에서 처리하고, 분리된 파트도 로컬에서 재생해요.' : `먼저 실행 환경을 준비해 주세요: ${listMissing(missing) || '필수 도구 또는 모델 설정이 없어요'}. README의 설치·모델 설정을 마친 뒤 서버를 다시 실행해 주세요.`;
+  notice.textContent = available ? '실행 환경 준비 완료. 파일은 이 컴퓨터에서 처리하고, 분리된 파트도 로컬에서 재생해요.' : session?.bundled_demo
+    ? '기본 샘플은 바로 연주할 수 있어요. 새 곡을 분리하려면 README에서 필요한 도구와 모델을 설정해 주세요.'
+    : `먼저 실행 환경을 준비해 주세요: ${listMissing(missing) || '필수 도구 또는 모델 설정이 없어요'}. README의 설치·모델 설정을 마친 뒤 서버를 다시 실행해 주세요.`;
   refreshSubmit();
 }
 function refreshSubmit() {
@@ -202,11 +204,48 @@ function previewMessage(event) {
     $('youtube-preview-status').textContent = `${data.message} 아래 숫자로 구간을 입력할 수 있어요.`;
   }
 }
+function selectedAudio() {
+  if (audioChoice === 'job') return job?.status === 'ready' ? job : null;
+  return session?.bundled_demo || null;
+}
+
+function renderAudioChoice() {
+  const demo = session?.bundled_demo, readyJob = job?.status === 'ready' ? job : null;
+  if (audioChoice === 'job' && !readyJob) audioChoice = 'demo';
+  if (audioChoice === 'demo' && !demo && readyJob) audioChoice = 'job';
+  const selected = selectedAudio();
+  $('demo-welcome').hidden = !demo;
+  if (demo) $('demo-name').textContent = `${demo.title} · ${demo.artist}`;
+  document.querySelectorAll('[data-audio-choice]').forEach((button) => {
+    const choice = button.dataset.audioChoice;
+    button.hidden = choice === 'demo' ? !demo : !readyJob;
+    const active = choice === audioChoice;
+    button.classList.toggle('selected', active); button.setAttribute('aria-pressed', String(active));
+  });
+  $('audio-choice').hidden = !selected;
+  $('player-section').hidden = !selected;
+  if (!selected) {
+    if (audioJob || loadingId || audioLoaded) resetAudio();
+    return;
+  }
+  $('track-title').textContent = audioChoice === 'demo' ? `${demo.title} · ${demo.artist}` : '내가 분리한 곡';
+  if (loadedId !== selected.id && loadingId !== selected.id) loadAudio(selected);
+}
+
+function selectAudioChoice(choice) {
+  if ((choice === 'demo' && session?.bundled_demo) || (choice === 'job' && job?.status === 'ready')) {
+    audioChoice = choice;
+    renderAudioChoice();
+  }
+}
+
 function renderJob(value) {
+  const previousJob = job;
   job = value;
+  if (job?.status === 'ready' && (previousJob?.id !== job.id || previousJob?.status !== 'ready')) audioChoice = 'job';
   $('job-section').hidden = !job;
   if (!job) {
-    $('player-section').hidden = true;
+    renderAudioChoice();
     refreshSubmit();
     return;
   }
@@ -224,10 +263,7 @@ function renderJob(value) {
     element.classList.toggle('done', stageIndex < index);
     element.setAttribute('aria-current', stageIndex === index ? 'step' : 'false');
   });
-  if (job.status === 'ready') {
-    $('player-section').hidden = false;
-    if (loadedId !== job.id && loadingId !== job.id) loadAudio(job);
-  }
+  renderAudioChoice();
   refreshSubmit();
 }
 function schedulePoll(id) {
@@ -284,7 +320,8 @@ async function submitJob(event) {
     try {
       const current = await api('/api/session');
       session = current;
-      if (current.job) { renderJob(current.job); if (!TERMINAL.has(job.status)) schedulePoll(job.id); }
+      renderJob(current.job || null);
+      if (job && !TERMINAL.has(job.status)) schedulePoll(job.id);
     } catch { /* Keep the actionable original error. */ }
   } finally { operation = false; renderDependencies(); refreshSubmit(); }
 }
@@ -307,7 +344,6 @@ async function deleteJob() {
   try {
     await api(`/api/jobs/${encodeURIComponent(job.id)}`, { method: 'DELETE' });
     clearTimeout(pollTimer); pollGeneration += 1;
-    resetAudio();
     renderJob(null);
     $('rights-confirmed').checked = false;
     showError('form-error');
@@ -369,7 +405,7 @@ async function loadAudio(readyJob) {
     for (const stem of STEMS) mediaPath(readyJob.stems?.[stem], readyJob.id);
     audioJob = readyJob; chunkCount = Math.ceil(duration / chunkSeconds);
     await getChunk(0);
-    if (generation !== loadGeneration || job?.id !== readyJob.id) return;
+    if (generation !== loadGeneration || selectedAudio()?.id !== readyJob.id) return;
     onsets = (readyJob.onsets || []).filter((value) => Number.isFinite(value) && value >= 0 && value < duration).sort((a, b) => a - b);
     audioLoaded = true; loadedId = readyJob.id; loadingId = null;
     setRepeatBounds(0, duration); updateLoopControls();
@@ -650,6 +686,8 @@ catch (error) { $('pad-status').textContent = errorText(error); }
 $('source-form').addEventListener('submit', submitJob);
 document.querySelectorAll('[data-source]').forEach((button) => button.addEventListener('click', () => selectSource(button.dataset.source)));
 document.querySelectorAll('[data-range]').forEach((button) => button.addEventListener('click', () => selectRange(button.dataset.range)));
+document.querySelectorAll('[data-audio-choice]').forEach((button) => button.addEventListener('click', () => selectAudioChoice(button.dataset.audioChoice)));
+$('open-demo').addEventListener('click', () => { selectAudioChoice('demo'); $('player-section').scrollIntoView({ block: 'start' }); });
 $('youtube-input').addEventListener('input', queuePreview);
 window.addEventListener('message', previewMessage);
 $('range-start').addEventListener('input', () => { selectionTouched = true; const start = Number($('range-start').value); setSelection(start, Math.max(start + 1, Number($('range-end').value))); });
@@ -741,7 +779,6 @@ window.addEventListener('pageshow', async (event) => {
   try {
     const current = await api('/api/session');
     session = current;
-    if (!current.job || current.job.id !== job?.id) resetAudio();
     renderDependencies(); renderJob(current.job || null);
     if (job && !TERMINAL.has(job.status)) schedulePoll(job.id);
   } catch (error) {
@@ -758,7 +795,8 @@ requestAnimationFrame(animate);
     const limit = session.limits?.max_upload_bytes;
     $('upload-limit').textContent = `파일은 외부 서버로 업로드하지 않아요.${limit ? ` 최대 ${Math.floor(limit / 1024 / 1024)} MB.` : ''}`;
     renderDependencies();
-    if (session.job) { renderJob(session.job); if (!TERMINAL.has(job.status)) schedulePoll(job.id); }
+    renderJob(session.job || null);
+    if (job && !TERMINAL.has(job.status)) schedulePoll(job.id);
   } catch (error) {
     $('dependencies').className = 'dependency-notice missing';
     $('dependencies').textContent = `로컬 서버에 연결하지 못했어요. 서버가 실행 중인지 확인한 뒤 새로고침해 주세요. ${errorText(error)}`;

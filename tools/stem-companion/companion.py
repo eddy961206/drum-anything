@@ -35,6 +35,9 @@ STEMS = ('vocals', 'bass', 'drums', 'other')
 TERMINAL = {'ready', 'failed', 'cancelled', 'dependency_missing'}
 FORMATS = 'wav,mp3,flac,mov,ogg,matroska,webm,aac,aiff'
 STATIC = Path(__file__).resolve().parent / 'static'
+BUNDLED_DEMO = Path(__file__).resolve().parent / 'bundled-demo'
+# A UUID4 job can never have all zero bits, so this ID cannot collide with a job.
+DEMO_ID = '0' * 32
 
 
 class Problem(Exception):
@@ -43,6 +46,24 @@ class Problem(Exception):
 
 class Cancelled(Problem):
     pass
+
+
+def bundled_demo():
+    """Read the packaged song without loading models or decoding the whole audio."""
+    metadata = json.loads((BUNDLED_DEMO / 'metadata.json').read_text(encoding='utf-8'))
+    lengths = []
+    for stem in STEMS:
+        with wave.open(str(BUNDLED_DEMO / (stem + '.wav')), 'rb') as wav:
+            if (wav.getnchannels(), wav.getsampwidth(), wav.getframerate()) != (2, 2, 44100):
+                raise Problem('The bundled sample has an unsupported audio format.')
+            lengths.append(wav.getnframes())
+    duration = min(lengths) / 44100
+    if max(lengths) != min(lengths) or abs(duration - metadata['duration']) > 1 / 44100:
+        raise Problem('The bundled sample stems do not have the expected duration.')
+    return {'id': DEMO_ID, 'status': 'ready', 'title': metadata['title'], 'artist': metadata['artist'],
+            'youtube_url': metadata['youtube_url'], 'duration': duration, 'output_gain': metadata['output_gain'],
+            'onsets': metadata['onsets'], 'chunk_seconds': PLAYBACK_CHUNK_SECONDS,
+            'stems': {stem: f'/media/{DEMO_ID}/{stem}.wav' for stem in STEMS}}
 
 
 def youtube_url(value):
@@ -583,6 +604,7 @@ class Server(ThreadingHTTPServer):
         if address[0] != '127.0.0.1':
             raise ValueError('Loopback-only binding is mandatory.')
         self.manager = manager
+        self.bundled_demo = bundled_demo()
         self.csrf = secrets.token_urlsafe(32)
         super().__init__(address, Handler)
 
@@ -662,6 +684,14 @@ class Handler(BaseHTTPRequestHandler):
             raise Problem('Expected a JSON object.')
         return data
 
+    def ready_stem(self, jid, filename):
+        if jid == DEMO_ID:
+            return safe_child(BUNDLED_DEMO, filename)
+        job = self.server.manager._get(jid)
+        if job.status != 'ready':
+            raise Problem('Audio is not ready.')
+        return safe_child(job.directory, filename)
+
     def do_GET(self):
         try:
             path = urlsplit(self.path).path
@@ -686,24 +716,19 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/session':
                 self.json_response({'csrf': self.server.csrf, 'dependencies': self.server.manager.config.dependencies(),
                     'limits': {'max_upload_bytes': MAX_UPLOAD, 'max_source_seconds': MAX_SOURCE_SECONDS,
-                               'max_excerpt_seconds': MAX_EXCERPT_SECONDS}, 'job': self.server.manager.current()})
+                               'max_excerpt_seconds': MAX_EXCERPT_SECONDS}, 'job': self.server.manager.current(),
+                    'bundled_demo': self.server.bundled_demo})
             elif re.fullmatch(r'/api/jobs/[a-f0-9]{32}', path):
                 with self.server.manager.lock:
                     self.json_response(self.server.manager._get(path.rsplit('/', 1)[1]).public())
             elif re.fullmatch(r'/media/[a-f0-9]{32}/(vocals|bass|drums|other)\.wav', path):
                 _, _, jid, filename = path.split('/')
                 with self.server.manager.lock:
-                    job = self.server.manager._get(jid)
-                    if job.status != 'ready':
-                        raise Problem('Audio is not ready.')
-                    self.file_response(safe_child(job.directory, filename), 'audio/wav')
+                    self.file_response(self.ready_stem(jid, filename), 'audio/wav')
             elif re.fullmatch(r'/media/[a-f0-9]{32}/chunks/[0-9]{1,5}/(vocals|bass|drums|other)\.wav', path):
                 _, _, jid, _, index, filename = path.split('/')
                 with self.server.manager.lock:
-                    job = self.server.manager._get(jid)
-                    if job.status != 'ready':
-                        raise Problem('Audio is not ready.')
-                    self.chunk_response(safe_child(job.directory, filename), int(index))
+                    self.chunk_response(self.ready_stem(jid, filename), int(index))
             elif path in {f'/samples/{name}.m4a' for name in ('kick', 'snare', 'hat', 'open-hat', 'crash')} | {'/samples/tom.flac'}:
                 filename = path.rsplit('/', 1)[1]
                 self.file_response(STATIC / 'samples' / filename, 'audio/flac' if filename.endswith('.flac') else 'audio/mp4')

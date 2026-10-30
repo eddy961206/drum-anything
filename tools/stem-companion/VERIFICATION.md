@@ -2,6 +2,12 @@
 
 ## 현재 변경 검증 범위
 
+### 저장소 기본 샘플 검증
+
+- 사용자가 2026-10-30에 공개 배포 권한을 확인한 전체 곡 분리 결과를 `bundled-demo`에 포함했다. 네 WAV는 각각 이전 결과와 SHA-256이 일치한다. 총 크기는 약 138 MiB이며 일반 Git으로 추적한다.
+- Windows Python 3.12를 `-S`로 실행하고 PATH에서 FFmpeg와 Deno를 제외한 환경에서 모델·분리 도구가 없는 상태를 확인했다. 실제 브라우저에서 기본 곡이 3:24로 로드되고 드럼 음소거, 재생, 곡 끝에서 전체 반복되는 것을 확인했다.
+- 별도 합성 사용자 결과가 준비된 브라우저에서 기본 샘플과 사용자 결과를 서로 전환했다. 이는 전환 UI 검증이며 새 곡을 실제로 분리한 검증은 아니다. 타 PC 실기기 확인과 직접 청감은 아직 하지 못했다.
+
 Windows에서 합성 51초 입력과 모의 모델로 조각 연결을 확인했다. 브라우저에서 65초 합성 스템으로 조각 경계·탐색·전체 반복·19–23초 구간 반복을 확인했다. 여섯 CC0 드럼 파일을 브라우저가 디코딩하고 패드 입력에 반응하는 것을 확인했다.
 
 ### Windows 실제 전체 곡 검증
@@ -13,7 +19,7 @@ Windows에서 합성 51초 입력과 모의 모델로 조각 연결을 확인했
 - 같은 원본의 10–40초를 이전 30초 결과 및 새 전체 곡 결과와 비교했다. 네 스템을 합한 파형의 원본 대비 재구성 SNR은 이전 27.33 dB, 새 결과 32.91 dB였다. 새 결과는 원본에도 공통 보정값 0.98을 적용해 비교했다. 두 실행의 입력 조각 길이와 모델의 랜덤 이동이 달라 이 차이를 한 원인으로 단정할 수 없다. 네 연결 구간 5초의 재구성 SNR은 26.31–35.24 dB였다.
 - 이 수치와 파형 확인은 네 파트의 합이 원본에 가까운지 보여줄 뿐, 드럼에 다른 악기가 섞였는지 또는 청감이 자연스러운지 증명하지 않는다. 분리 전 개별 악기 정답과 직접 청취 입력이 없어 **실제 분리 품질, 청감과 출력 지연은 미검증**이다.
 
-최신 Windows 회귀 검사는 Python 49건 중 48건 통과, 심볼릭 링크 권한이 없어 1건 건너뜀, Node UI 27건 통과다. 아래 Linux 8초 검증과 그 한계는 이전 구현의 기록이다.
+최신 Windows 회귀 검사는 Python 50건 중 49건 통과, 심볼릭 링크 권한이 없어 1건 건너뜀, Node UI 29건 통과다. 아래 Linux 8초 검증과 그 한계는 이전 구현의 기록이다.
 
 ## Previous Linux regression checks
 
@@ -88,4 +94,4 @@ The harness verified `ready`, retrieved all four WAVs over HTTP, confirmed only 
 
 ## Publication boundary
 
-Only files listed in `SOURCE_MANIFEST.json` are published, including six attributed CC0 drum recordings. Virtual environments, model weights, executables, user music, generated stems, caches, detailed execution reports, credentials and bytecode are excluded. No project license has been selected; external dependency/model/music rights remain separate.
+Only files listed in `SOURCE_MANIFEST.json` are published, including six attributed CC0 drum recordings and the one user-authorized four-stem sample. Virtual environments, model weights, executables, other user music, caches, detailed execution reports, credentials and bytecode are excluded. No project license has been selected; external dependency/model/music rights remain separate.

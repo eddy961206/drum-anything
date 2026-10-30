@@ -28,7 +28,7 @@ async function fixture(overrides = {}) {
   elements.get('excerpt-start').value = '0';
   elements.get('excerpt-duration').value = '60';
   const group = (key, values) => values.map((value) => { const element = new Element(); element.dataset[key] = value; return element; });
-  const groups = { '[data-source]': group('source', ['file', 'youtube']), '[data-range]': group('range', ['full', 'excerpt']), '[data-loop-mode]': group('loopMode', ['full', 'section']), '[data-mode]': group('mode', ['all', 'vocals', 'instrumental', 'drummer']), '[data-stage]': group('stage', ['acquiring', 'normalizing', 'separating', 'analyzing', 'ready']) };
+  const groups = { '[data-source]': group('source', ['file', 'youtube']), '[data-range]': group('range', ['full', 'excerpt']), '[data-audio-choice]': group('audioChoice', ['demo', 'job']), '[data-loop-mode]': group('loopMode', ['full', 'section']), '[data-mode]': group('mode', ['all', 'vocals', 'instrumental', 'drummer']), '[data-stage]': group('stage', ['acquiring', 'normalizing', 'separating', 'analyzing', 'ready']) };
   const param = () => ({ value: 0, setValueAtTime(value) { this.value = value; }, setTargetAtTime(value) { this.value = value; }, exponentialRampToValueAtTime() {}, cancelScheduledValues() {} });
   const node = () => ({ connect() {}, disconnect() {}, gain: param() });
   const audio = { context: null, nodes: [], downloads: 0, sampleDownloads: 0, duration: 3, started: 0 };
@@ -64,7 +64,7 @@ async function fixture(overrides = {}) {
 }
 async function ready(f, duration = 3) {
   f.audio.duration = duration;
-  f.run(`job = {id: 'fixture', status: 'ready', duration: ${duration}, chunk_seconds: 20, onsets: [0.1, NaN, -1, 1.1], stems: Object.fromEntries(STEMS.map(stem => [stem, \`/media/fixture/\${stem}.wav\`]))}`);
+  f.run(`audioChoice = 'job'; job = {id: 'fixture', status: 'ready', duration: ${duration}, chunk_seconds: 20, onsets: [0.1, NaN, -1, 1.1], stems: Object.fromEntries(STEMS.map(stem => [stem, \`/media/fixture/\${stem}.wav\`]))}`);
   await f.run('loadAudio(job)');
 }
 
@@ -87,6 +87,31 @@ test('local file works without YouTube-only dependencies', async () => {
 test('missing base dependencies disable creation', async () => {
   const f = await fixture({ dependencies: { ready: false, youtube_ready: false, missing: ['ffmpeg'] } });
   assert.equal(f.elements.get('create-job').disabled, true); assert(f.elements.get('dependencies').textContent.includes('ffmpeg'));
+});
+test('bundled song loads and plays without the separation tools', async () => {
+  const demo = { id: 'sample', status: 'ready', title: '기본 곡', artist: '연주자', duration: 3, chunk_seconds: 20, onsets: [0.1], stems: Object.fromEntries(['vocals', 'bass', 'drums', 'other'].map((s) => [s, `/media/sample/${s}.wav`])) };
+  const f = await fixture({ dependencies: { ready: false, youtube_ready: false, missing: ['ffmpeg'] }, bundled_demo: demo });
+  await new Promise(setImmediate);
+  assert.equal(f.elements.get('player-section').hidden, false);
+  assert.equal(f.elements.get('play').disabled, false);
+  assert.equal(f.elements.get('track-title').textContent, '기본 곡 · 연주자');
+  assert(f.elements.get('dependencies').textContent.includes('기본 샘플은 바로 연주'));
+  await f.run('play()');
+  assert.equal(f.audio.nodes.length, 4);
+});
+test('a completed user song can switch to and from the bundled song', async () => {
+  const demo = { id: 'sample', status: 'ready', title: '기본 곡', artist: '연주자', duration: 3, chunk_seconds: 20, onsets: [], stems: Object.fromEntries(['vocals', 'bass', 'drums', 'other'].map((s) => [s, `/media/sample/${s}.wav`])) };
+  const f = await fixture({ bundled_demo: demo }); await new Promise(setImmediate);
+  f.run("renderJob({id:'fixture', status:'ready', duration:3, chunk_seconds:20, onsets:[], stems:Object.fromEntries(STEMS.map(s => [s, `/media/fixture/${s}.wav`]))})");
+  await new Promise(setImmediate);
+  assert.equal(f.elements.get('track-title').textContent, '내가 분리한 곡');
+  assert.equal(f.run('loadedId'), 'fixture');
+  f.run("selectAudioChoice('demo')"); await new Promise(setImmediate);
+  assert.equal(f.run('loadedId'), 'sample');
+  f.run("selectAudioChoice('job')"); await new Promise(setImmediate);
+  assert.equal(f.run('loadedId'), 'fixture');
+  f.run('renderJob(null)'); await new Promise(setImmediate);
+  assert.equal(f.run('loadedId'), 'sample');
 });
 test('time formatting and excerpt numeric validation', async () => {
   const f = await fixture(); assert.equal(f.run('formatTime(125)'), '2:05');

@@ -37,3 +37,16 @@
 .pad-volume { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 18px auto 0; color: var(--muted); font-size: 12px; }
 .pad-volume input { width: min(190px, 40vw); accent-color: var(--violet); }
 .pad-volume output { min-width: 35px; font-variant-numeric: tabular-nums; }
+.demo-welcome { display: flex; align-items: center; justify-content: space-between; gap: 18px; max-width: 610px; margin: 28px auto 0; padding: 15px 18px; text-align: left; border: 1px solid #6e5a80; border-radius: 13px; background: #292036; }
+.demo-welcome div { display: grid; gap: 5px; min-width: 0; }
+.demo-welcome span { color: var(--muted); font-size: 11px; }
+.demo-welcome strong { font-size: 14px; line-height: 1.5; }
+.demo-welcome button { flex-shrink: 0; border: 1px solid var(--violet); border-radius: 9px; padding: 10px 13px; background: var(--violet); color: #21172d; font-size: 12px; font-weight: 700; }
+.audio-choice { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 20px; color: var(--muted); font-size: 12px; }
+.audio-choice span { margin-right: 5px; }
+.audio-choice button { border: 1px solid #6f5d80; border-radius: 8px; background: transparent; padding: 8px 12px; font-size: 12px; }
+.audio-choice button.selected { background: var(--violet); border-color: var(--violet); color: #21172d; font-weight: 700; }
+@media (max-width: 700px) {
+  .demo-welcome { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .demo-welcome button { width: 100%; }
+}

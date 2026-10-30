@@ -12,7 +12,9 @@
   <div class="shell">
     <header class="site-header"><a href="/" class="brand"><span class="brand-symbol" aria-hidden="true">▥</span> 내 방의 드러머</a><span class="local-label">이 컴퓨터에서만 · 127.0.0.1</span></header>
     <main>
-      <section class="intro"><h1>좋아하는 노래의<br><em>드러머가 되어봐.</em></h1><p>음원을 네 파트로 나누고, 원래 드럼 대신 내 리듬을 얹어요.</p></section>
+      <section class="intro"><h1>좋아하는 노래의<br><em>드러머가 되어봐.</em></h1><p>음원을 네 파트로 나누고, 원래 드럼 대신 내 리듬을 얹어요.</p>
+        <div id="demo-welcome" class="demo-welcome" hidden><div><span>바로 연주하는 기본 샘플</span><strong id="demo-name"></strong></div><button id="open-demo" type="button">샘플 곡 연주하기 ↓</button></div>
+      </section>
       <section class="source-section" aria-labelledby="source-heading">
         <div class="section-heading"><h2 id="source-heading">1. 노래 가져오기</h2><span>한 번에 한 곡 · 원본 최대 60분 / 100 MB</span></div>
         <div id="dependencies" class="dependency-notice" role="status">로컬 실행 환경을 확인하고 있어요.</div>
@@ -56,7 +58,8 @@
       <section id="player-section" class="player-section" aria-labelledby="player-heading" hidden>
         <div class="section-heading"><h2 id="player-heading">2. 내 리듬으로 연주하기</h2><span id="audio-status">네 파트를 불러오고 있어요.</span></div>
         <p id="audio-error" class="notice error" role="alert" hidden></p>
-        <div class="transport"><button id="play" class="play-button" type="button" disabled aria-label="재생">▶</button><div class="track-timeline"><div class="timeline-label"><strong>내 연습 구간</strong><span><output id="elapsed">0:00</output> / <span id="total-time">0:00</span></span></div><label class="sr-only" for="seek">재생 위치</label><input type="range" id="seek" min="0" max="1" value="0" step="0.01" disabled></div><label class="loop-control"><input type="checkbox" id="loop" checked> 반복</label></div>
+        <div id="audio-choice" class="audio-choice" role="group" aria-label="연주할 곡" hidden><span>연주할 곡</span><button type="button" data-audio-choice="demo" aria-pressed="true">기본 샘플</button><button type="button" data-audio-choice="job" aria-pressed="false" hidden>내가 분리한 곡</button></div>
+        <div class="transport"><button id="play" class="play-button" type="button" disabled aria-label="재생">▶</button><div class="track-timeline"><div class="timeline-label"><strong id="track-title">내 연습 구간</strong><span><output id="elapsed">0:00</output> / <span id="total-time">0:00</span></span></div><label class="sr-only" for="seek">재생 위치</label><input type="range" id="seek" min="0" max="1" value="0" step="0.01" disabled></div><label class="loop-control"><input type="checkbox" id="loop" checked> 반복</label></div>
         <div class="loop-settings">
           <div class="loop-mode" role="group" aria-label="반복 범위"><span>반복 범위</span><button type="button" data-loop-mode="full" class="selected" aria-pressed="true">전체 곡</button><button type="button" data-loop-mode="section" aria-pressed="false">구간 지정</button></div>
           <div id="loop-section" class="loop-section" hidden>

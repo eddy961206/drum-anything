@@ -536,6 +536,29 @@ class HTTPChecks(unittest.TestCase):
         self.assertEqual(self.request('GET', f'/media/{job.id}/chunks/1/drums.wav')[0], 400)
         self.manager.delete(job.id)
 
+    def test_bundled_song_works_without_separation_tools_and_cannot_be_deleted(self):
+        missing = {'ready': False, 'youtube_ready': False, 'missing': ['demucs'], 'youtube_missing': []}
+        with patch.object(c.Config, 'dependencies', return_value=missing):
+            status, _, session = self.request('GET', '/api/session')
+        self.assertEqual(status, 200)
+        demo = session['bundled_demo']
+        self.assertFalse(session['dependencies']['ready'])
+        self.assertEqual(demo['id'], c.DEMO_ID)
+        self.assertAlmostEqual(demo['duration'], 204.3356, places=3)
+        self.assertEqual(len(demo['onsets']), 262)
+        for index, frames in ((0, 20 * 44100), (10, round((demo['duration'] - 200) * 44100))):
+            status, headers, data = self.request('GET', f'/media/{c.DEMO_ID}/chunks/{index}/drums.wav')
+            self.assertEqual(status, 200)
+            self.assertEqual(headers['Content-Type'], 'audio/wav')
+            with wave.open(io.BytesIO(data), 'rb') as wav:
+                self.assertEqual(wav.getnframes(), frames)
+        self.assertEqual(self.request('GET', f'/media/{c.DEMO_ID}/chunks/11/drums.wav')[0], 400)
+        self.assertEqual(self.request('GET', f'/media/{c.DEMO_ID}/chunks/0/drums.wav',
+                                      headers={'Host': f'localhost:{self.server.server_port}'})[0], 404)
+        headers = {'Origin': 'http://' + self.host, 'X-CSRF-Token': self.server.csrf}
+        self.assertEqual(self.request('DELETE', '/api/jobs/' + c.DEMO_ID, headers=headers)[0], 400)
+        self.assertTrue((c.BUNDLED_DEMO / 'drums.wav').is_file())
+
     def test_drum_samples_are_local_and_not_available_from_preview_origin(self):
         for name in ('kick.m4a', 'snare.m4a', 'tom.flac', 'hat.m4a', 'open-hat.m4a', 'crash.m4a'):
             status, headers, data = self.request('GET', '/samples/' + name)

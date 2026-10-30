@@ -8,43 +8,43 @@
     },
     {
       "path": "README.md",
-      "bytes": 16883,
-      "sha256": "5d570978fd86e0f3c325bee4b9c531f3e7b324748485afa81a12b06b736883df"
+      "bytes": 18251,
+      "sha256": "ec3b217d2b03db9855c8ce7dd08e9c7272806b0a56b99e34bd3a5827b2c55413"
     },
     {
       "path": "VERIFICATION.md",
-      "bytes": 9629,
-      "sha256": "2e9ab4c7f5c82e6608a7e76eaa2f16d6040efaa0065bd882740ac65e3616b883"
+      "bytes": 10516,
+      "sha256": "c8ed3efc7097486fe71bfcb7bc9a32b90f140ef7a446bf180dd28490e19c7776"
     },
     {
       "path": "companion.py",
-      "bytes": 43021,
-      "sha256": "6a1c276e7b5ade1e5dff5b19608fba6a57454fd03d5c2861fcf1d3a914441b85"
+      "bytes": 44379,
+      "sha256": "2943a8092292992cd6777da5169cb6a44eb06415f59cd784376dcdcda0e6133c"
     },
     {
       "path": "static/index.html",
-      "bytes": 11480,
-      "sha256": "8b6e24965117aca45eae92e6370c6012f6ec65d0d12f960720d35eb48f9a938e"
+      "bytes": 12056,
+      "sha256": "d221cab151e2992027638828b5259e8fcd8c323fb83870cf7623293ceec8f6d5"
     },
     {
       "path": "static/app.js",
-      "bytes": 44855,
-      "sha256": "1fbbea7cc911aea88284c8dd9f0b837d4b20af405c4d193c128f4a573a23b901"
+      "bytes": 46736,
+      "sha256": "71b48ac13a316fda895686bd4fe9c161b4eca3bf5381786bacbfb04f719f9074"
     },
     {
       "path": "static/style.css",
-      "bytes": 14127,
-      "sha256": "ca240f921ce93c1e5c80fdb19467b386ed5a2b012e0a20b958253d3e133e9e1e"
+      "bytes": 15330,
+      "sha256": "23403c617912b3943a70a7ef257a65687acc3f8241d252849e53e3d35f379d4a"
     },
     {
       "path": "tests/test_companion.py",
-      "bytes": 30944,
-      "sha256": "053f0ff257c538450b3ed59a4ced44e88f8ae2ecf70065abddb79212f306d4df"
+      "bytes": 32551,
+      "sha256": "16f88892023fec8ea950a33d3a4e731de9934cad2adfbb6f834153107faa9dc4"
     },
     {
       "path": "tests/test_ui.cjs",
-      "bytes": 18453,
-      "sha256": "e2025a6bf16516c47a859c60aa232a63b51443c0a63caa9a6b2773fada66cded"
+      "bytes": 20482,
+      "sha256": "deeaeb8e0b1d820400b439017ff7efdc451a9fd2e5656722d368f5fa76f4c21b"
     },
     {
       "path": "static/youtube-preview.html",
