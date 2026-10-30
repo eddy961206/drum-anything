@@ -1,0 +1,14 @@
+{
+  "name": "drum-anything",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Small browser-based music toys",
+  "workspaces": ["apps/*"],
+  "scripts": {
+    "test": "npm test --workspaces",
+    "check": "npm run check --workspaces"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

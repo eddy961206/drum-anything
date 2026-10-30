@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#17121f">
+  <meta name="description" content="좋아하는 노래에 짧은 필인과 크래시를 얹어 보세요. 파일 업로드 없이, 점수도 연습 숙제도 없이.">
+  <title>후렴에 한 방 — 손끝 리믹서</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2317121f'/%3E%3Cpath d='M16 35v12m16-24v24m16-34v34' stroke='%23ffbe53' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="후렴에 한 방 홈"><svg viewBox="0 0 38 38" aria-hidden="true"><path d="M4 15v8M12 9v20M20 3v32M28 11v16M36 16v6"/></svg><span>후렴에 한 방</span></a>
+      <button class="file-button outline-button" id="load-file"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h6l2 3h10v11H3z"/></svg>내 파일 불러오기</button>
+      <input class="visually-hidden" type="file" id="audio-file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac,.aac" tabindex="-1" aria-label="내 기기의 음악 파일 선택">
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="main-title">
+        <h1 id="main-title">좋아하는 노래에,<br class="mobile-break"> 내 한 방.</h1>
+        <p>후렴이 오면 <strong>‘짧은 필인’</strong>을 톡.<br class="mobile-break"> 잘 맞추려 하지 말고, 신나게 얹어보세요.</p>
+      </section>
+
+      <div class="source-tabs" role="group" aria-label="음악 선택 방식"><button id="source-local" class="selected" aria-pressed="true">데모 · 내 파일</button><button id="source-youtube" aria-pressed="false">YouTube 링크</button><button id="source-stems" aria-pressed="false">내가 드러머</button></div>
+      <div class="error" id="error" role="alert" hidden></div>
+      <section class="youtube-panel panel" id="youtube-panel" hidden aria-labelledby="youtube-title">
+        <div class="youtube-topline"><div><h2 id="youtube-title">좋아하는 영상과 같이 놀기</h2><p>공식 플레이어로 재생하고, 내 드럼 소리를 얹어요.</p></div><span class="external-notice">영상을 불러오면 YouTube에 연결돼요</span></div>
+        <form id="youtube-form" class="youtube-form"><label class="visually-hidden" for="youtube-url">YouTube 영상 링크</label><input id="youtube-url" type="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" spellcheck="false" required><button id="youtube-load" class="outline-button" type="submit">영상 불러오기</button></form>
+        <div class="youtube-stage" id="youtube-stage" hidden><div id="youtube-player"></div></div>
+        <p class="youtube-hint" id="youtube-hint">영상은 자동 재생되지 않아요. 불러온 뒤 영상의 ▶를 눌러주세요.</p>
+        <p class="youtube-limit">YouTube에서는 원곡의 드럼 제거·음원 추출·먹먹하게 효과·A/B 반복을 지원하지 않아요. 박자 맞춤은 수동이며 영상 재생과 패드 사이에 지연이 있을 수 있어요.</p>
+      </section>
+      <section class="stems-panel panel" id="stems-panel" hidden aria-labelledby="stems-title">
+        <div class="stems-heading"><h2 id="stems-title">원래 드러머 자리, 내가 앉기.</h2><p>같은 곡에서 미리 분리한 4개 파일을 골라주세요. 모든 파일은 같은 시점에 시작해야 해요.</p></div>
+        <div class="stem-inputs">
+          <label><span>드럼</span><input id="stem-drums" type="file" accept="audio/*,.wav,.mp3,.m4a,.flac,.ogg"><small>drums</small></label>
+          <label><span>베이스</span><input id="stem-bass" type="file" accept="audio/*,.wav,.mp3,.m4a,.flac,.ogg"><small>bass</small></label>
+          <label><span>나머지 악기</span><input id="stem-other" type="file" accept="audio/*,.wav,.mp3,.m4a,.flac,.ogg"><small>other</small></label>
+          <label><span>보컬</span><input id="stem-vocals" type="file" accept="audio/*,.wav,.mp3,.m4a,.flac,.ogg"><small>vocals</small></label>
+        </div>
+        <div class="stems-load-row"><button class="outline-button" id="stems-load">내 밴드 준비하기</button><p>같은 길이의 3분 이하 파일 · 합계 100 MB 이하</p></div>
+        <p class="stems-notice">이 앱에서 AI로 음원을 분리하지는 않아요. 분리된 음원이 필요해요. YouTube 소리 추출·다운로드는 하지 않아요.</p>
+        <div class="stem-mix" id="stem-mix" hidden><span>어떤 소리와 칠까요?</span><div role="group" aria-label="분리 음원 믹스"><button data-mix="mix" id="mix-all" aria-pressed="false">모두 듣기</button><button data-mix="vocals" id="mix-vocals" aria-pressed="false">보컬만</button><button data-mix="instrumental" id="mix-instrumental" aria-pressed="false">악기만</button><button data-mix="drummer" id="mix-drummer" class="selected" aria-pressed="true">내가 드러머 <small>드럼 끄기</small></button></div></div>
+      </section>
+      <section class="player panel" id="local-player" aria-label="노래 재생">
+        <button class="play-button" id="play" aria-label="데모 재생" title="재생 / 일시정지 (Space)"><svg class="play-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="M10 6l16 10-16 10z"/></svg><svg class="pause-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="M10 6v20M22 6v20"/></svg></button>
+        <div class="track-info"><h2 id="track-title">Midnight Window</h2><p id="track-detail">직접 만든 데모 · 104 BPM</p><button class="text-button" id="demo" hidden>데모로 돌아가기</button></div>
+        <div class="timeline">
+          <canvas id="waveform" height="72" aria-hidden="true"></canvas>
+          <div class="seek-row"><output id="current-time" for="seek">0:00</output><input type="range" id="seek" min="0" max="37" value="0" step="0.01" aria-label="노래 재생 위치" aria-valuetext="0분 0초"><span id="duration">0:37</span></div>
+        </div>
+        <button class="restart-button icon-button" id="restart" aria-label="노래 처음으로" title="처음으로"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9a8 8 0 1 1-1 6M5 3v6h6"/></svg></button>
+      </section>
+
+      <section class="timing panel" aria-label="박자 설정">
+        <div class="tempo"><label for="bpm">BPM</label><input id="bpm" type="number" inputmode="numeric" min="40" max="220" value="104" aria-describedby="timing-help"></div>
+        <button class="tap-button outline-button" id="tap"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15v5M10 9v11M16 4v16M22 11v9"/></svg>박자 탭하기<span class="tap-light" aria-hidden="true"></span></button>
+        <div class="quantize"><span>소리가 나오는 때</span><div class="segmented" role="group" aria-label="패드 타이밍"><button id="next-beat" class="selected" aria-pressed="true">다음 박자</button><button id="immediate" aria-pressed="false">즉시</button></div></div>
+      </section>
+      <p class="timing-help" id="timing-help">박자가 어긋나면 노래에 맞춰 4번 탭해요. 자동 분석이 아니라, 내가 맞추는 박자예요.</p>
+
+      <section class="guide-section" id="guide-section" hidden aria-label="드럼 타이밍 따라치기">
+        <div class="guide-toolbar"><div><h3>드럼이 들어오는 순간, 살짝 힌트</h3><p id="guide-detail">드럼 파일의 소리 시작점을 추정해요. 킥·스네어를 구분하지는 않아요.</p></div><div class="segmented" role="group" aria-label="연주 방식"><button id="free-mode" class="selected" aria-pressed="true">자유롭게</button><button id="guided-mode" aria-pressed="false">따라치기</button></div></div>
+        <div class="guide-lane" id="guide-lane" hidden><canvas id="guide-canvas" height="70" aria-label="드럼 소리 시작점을 표시하는 타이밍 힌트"></canvas><div class="guide-target" aria-hidden="true"></div><span>여기에서 톡</span></div>
+        <p id="guide-tip" hidden>점이 선에 오면 킥이나 스네어를 가볍게. 점수는 없어요. 추정한 타이밍이라 원곡과 다를 수 있어요.</p>
+      </section>
+      <section class="performance" aria-labelledby="pads-heading">
+        <div class="pads-heading"><h2 id="pads-heading">노래는 흐르게. 손은 자유롭게.</h2><p id="status" role="status" aria-live="polite">먼저 ▶를 누르면 바로 놀 수 있어요.</p></div>
+        <div class="pads">
+          <button class="pad pad-fill" id="pad-fill" data-pad="fill" aria-label="짧은 필인, F키"><svg viewBox="0 0 72 72" aria-hidden="true" class="fill-symbol"><path d="M16 46v9M36 32v23M56 14v41"/></svg><strong>짧은 필인</strong><span class="pad-description">한 번에 두 박자 + 크래시</span><kbd>F</kbd></button>
+          <button class="pad pad-crash" id="pad-crash" data-pad="crash" aria-label="크래시, J키"><svg viewBox="0 0 72 72" aria-hidden="true" class="crash-symbol"><path d="m36 4 7 21 18-12-10 20 20 5-21 7 11 19-20-12-7 20-5-22-21 12 12-20-20-7 23-5-12-19 20 12z"/></svg><strong>크래시</strong><span class="pad-description">지금, 터뜨리는 한 방</span><kbd>J</kbd></button>
+          <button class="pad pad-kick" id="pad-kick" data-pad="kick" aria-label="킥, D키"><svg viewBox="0 0 72 72" aria-hidden="true" class="kick-symbol"><circle cx="36" cy="36" r="24"/></svg><strong>킥</strong><span class="pad-description">내 손으로 둥, 둥</span><kbd>D</kbd></button>
+          <button class="pad pad-muffle" id="pad-muffle" data-pad="muffle" aria-label="먹먹하게, K키를 누르고 있으면 효과 적용" aria-pressed="false"><svg viewBox="0 0 72 72" aria-hidden="true" class="muffle-symbol"><path d="M4 39C24 7 48 65 68 33"/></svg><strong>먹먹하게</strong><span class="pad-description" id="muffle-description">누르고 있다 떼면 원래대로</span><kbd>K <span>홀드</span></kbd></button>
+        </div>
+      </section>
+
+      <section class="mix panel" aria-label="소리 조절">
+        <div class="mix-control"><label for="master">전체 볼륨</label><input type="range" id="master" min="0" max="100" value="65"><output id="master-value" for="master">65%</output></div>
+        <div class="mix-control"><label for="effects">패드 소리</label><input type="range" id="effects" min="0" max="100" value="70"><output id="effects-value" for="effects">70%</output></div>
+        <button class="text-button more-button" id="more" aria-expanded="false" aria-controls="advanced">더 세밀하게<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+      </section>
+      <section class="advanced panel" id="advanced" hidden aria-label="추가 연주 설정">
+        <div class="loop-settings"><h3>좋은 부분, 한 번 더</h3><p>듣다가 시작 A와 끝 B를 찍으면 그 구간만 반복해요.</p><div class="loop-buttons"><button id="loop-a" class="outline-button">A 시작 <span id="a-time">—</span></button><button id="loop-b" class="outline-button">B 끝 <span id="b-time">—</span></button><button id="loop-toggle" class="outline-button" aria-pressed="false" disabled>반복 켜기</button><button id="loop-clear" class="text-button">지우기</button></div></div>
+        <div class="extra-pad"><h3>하나씩 두드리기</h3><button id="pad-snare" data-pad="snare" class="snare-button outline-button">스네어 <kbd>S</kbd></button><p>Space 재생 / 일시정지 · T 박자 탭</p></div>
+      </section>
+
+      <aside class="notes"><p><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>내 파일은 이 브라우저에서만 재생돼요. 서버에 업로드하거나 저장하지 않아요.</p><p>원곡의 드럼은 지워지지 않고, 내 소리가 그 위에 더해져요. 파일은 새로고침하면 다시 골라주세요. YouTube는 링크를 불러온 경우에만 연결돼요.</p></aside>
+    </main>
+    <footer><span>정답 없는 손끝 리믹스.</span><span>헤드폰을 쓰면 작은 소리도 더 잘 들려요.</span></footer>
+  </div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

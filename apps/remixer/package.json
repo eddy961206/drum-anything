@@ -1,0 +1,1 @@
+{"name":"chorus-pocket-remixer","version":"1.0.0","private":true,"type":"module","scripts":{"check":"node --check dist/app.js && node --check dist/audio.js && node --check dist/timing.js && node --check dist/youtube.js && node --check dist/onsets.js","test":"node --test tests/*.test.js"}}

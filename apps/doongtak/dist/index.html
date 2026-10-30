@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5f3ec">
+  <meta name="description" content="두 손가락으로 즐기는 1분 드럼 놀이터. 포근한 반주에 둥, 탁. 점수도 숙제도 없이 나에게 맞춰요.">
+  <title>둥탁 — 두 손가락의 작은 합주</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'%3E%3Crect rx='22' width='80' height='80' fill='%23f5f3ec'/%3E%3Ccircle cx='27' cy='40' r='20' fill='%23ed774d' stroke='%23242420' stroke-width='3'/%3E%3Ccircle cx='53' cy='40' r='20' fill='%23bfcb99' stroke='%23242420' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <a class="brand" href="./" aria-label="둥탁 첫 화면"><span class="brand-mark" aria-hidden="true"><i></i><i></i></span>둥탁</a>
+      <button class="settings-trigger" id="settings-open" aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/><path d="m9 3-1 3-3 1-2 3 2 2-1 3 3 3 3-1 2 2 3-1 1-3 3-1 1-3-2-2 1-3-3-2-3 1-2-2Z"/></svg><span>소리 설정</span></button>
+    </header>
+
+    <section class="intro" aria-labelledby="main-title">
+      <div><h1 id="main-title">잘 치려고 말고,<br>그냥 둥탁.</h1><p>두 손가락이면 충분해. 반주는 내가 맞춰줄게.</p></div>
+      <div class="timer" role="timer" aria-label="남은 시간 60초"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="timer-track" cx="60" cy="60" r="53"/><circle class="timer-progress" id="timer-circle" cx="60" cy="60" r="53"/></svg><div><strong id="seconds">60</strong><span>초</span></div></div>
+    </section>
+
+    <section class="studio" aria-label="드럼 연주">
+      <div class="studio-header"><div class="track-info"><h2>오늘의 그루브</h2><span>포근한 로파이 · 88 BPM</span></div><div class="mode-switch" role="group" aria-label="연주 모드"><button id="guided-mode" class="selected" aria-pressed="true">따라 치기</button><button id="free-mode" aria-pressed="false">마음대로</button></div></div>
+      <div class="rhythm-area" id="rhythm-area">
+        <div class="lane-labels" aria-hidden="true"><span>둥</span><span>탁</span></div>
+        <div class="rhythm-grid" id="rhythm-grid" role="img" aria-label="주황은 둥, 초록은 탁. 움직이는 선이 점에 오면 쳐 보세요."><div class="playhead" id="playhead" aria-hidden="true"></div></div>
+      </div>
+      <div class="free-message" id="free-message" hidden><span class="free-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><p>정해진 박자 없이, 내키는 대로 둥탁.</p></div>
+      <div class="pads">
+        <button class="pad kick" id="kick-pad" data-drum="kick" aria-label="둥, 킥 드럼. 키보드 F 또는 D"><span class="pad-name">KICK</span><span class="pad-word">둥</span><kbd>F</kbd><span class="pad-ripple" aria-hidden="true"></span></button>
+        <button class="pad snare" id="snare-pad" data-drum="snare" aria-label="탁, 스네어 드럼. 키보드 J 또는 K"><span class="pad-name">SNARE</span><span class="pad-word">탁</span><kbd>J</kbd><span class="pad-ripple" aria-hidden="true"></span></button>
+      </div>
+      <div class="feedback" id="feedback" aria-live="polite">패드를 눌러 소리를 들어봐. 준비되면 같이 시작!</div>
+      <div class="transport">
+        <div class="round-progress"><label for="round-progress">부담 없이 1분</label><div class="progress-row"><progress id="round-progress" value="0" max="60"></progress><span id="elapsed">0:00 / 1:00</span></div></div>
+        <button class="play-button" id="play-button"><svg id="play-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4 20 12 7 20Z"/></svg><span id="play-label">같이 연주하기</span></button>
+        <button class="restart-button" id="restart-button" aria-label="처음부터 다시" title="처음부터 다시"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8a8 8 0 1 1-1 7M5 3v6h6"/></svg></button>
+      </div>
+    </section>
+
+    <section class="feeling" aria-label="나에게 맞추기"><div class="feeling-controls"><h2>지금 어때?</h2><button id="easier-up" data-feeling="up">너무 쉬워 <span aria-hidden="true">↗</span></button><button id="just-right" aria-pressed="false">딱 좋아 <span class="lock-icon" aria-hidden="true">✓</span></button><button id="easier-down" data-feeling="down">조금 벅차 <span aria-hidden="true">↘</span></button></div><p id="adaptive-status" aria-live="polite">어려움은 구절 사이에만 살짝. ‘딱 좋아’를 누르면 지금 그대로.</p></section>
+    <footer><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-3a8 8 0 0 1 16 0v3M4 13H2v7h4v-7Zm16 0h2v7h-4v-7Z"/></svg><p>이어폰이면 더 좋아요. <span>블루투스는 소리가 조금 늦을 수 있어요.</span></p></footer>
+    <noscript><p class="noscript">둥탁을 연주하려면 브라우저에서 JavaScript를 켜 주세요.</p></noscript>
+  </main>
+
+  <dialog id="settings-dialog" aria-labelledby="settings-title"><div class="dialog-heading"><h2 id="settings-title">편하게 들리는 만큼</h2><button class="dialog-close" id="settings-close" aria-label="설정 닫기">×</button></div><p class="dialog-subtitle">소리는 이 기기에서만 만들어요. 마이크는 필요 없어요.</p><div class="setting-row"><label for="volume">전체 소리</label><output id="volume-value" for="volume">65%</output></div><input id="volume" type="range" min="0" max="100" value="65" aria-label="전체 소리 크기"><button class="mute-button" id="mute-button" aria-pressed="false">소리 끄기</button><div class="setting-divider"></div><label class="check-row"><input id="auto-adapt" type="checkbox" checked><span>연주에 맞춰 조금씩 조절하기<small>잘 맞는 구절이 이어질 때만 살짝 바꿔요.</small></span></label><div class="setting-divider"></div><div class="setting-row"><label for="latency">타이밍 보정</label><output id="latency-value" for="latency">0 ms</output></div><input id="latency" type="range" min="-150" max="350" step="10" value="0" aria-describedby="latency-help"><p class="setting-help" id="latency-help">소리가 늦게 들리면 + 쪽으로. 맞았는지 보는 기준만 조절해요. 블루투스 자체의 지연은 없애지 못해요.</p><button class="dialog-done" id="settings-done">이대로 좋아</button></dialog>
+</body>
+</html>
