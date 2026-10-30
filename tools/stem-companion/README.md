@@ -16,7 +16,7 @@
 
 ## 먼저 알아둘 점
 
-이 소스는 사용자가 이용 권한을 확인한 콘텐츠용입니다. **공개 영상이나 개인용이라는 이유만으로 다운로드·분리 권한이 생기지는 않습니다.** 권리 및 [YouTube 이용약관](https://www.youtube.com/static?template=terms)을 별도로 확인하세요. 체크박스는 허가를 부여하지 않습니다. 지역/연령/로그인/결제/DRM/봇 검사로 막히면 작업이 실패하며, 쿠키·계정·프록시·CAPTCHA 풀이·접근제한 우회는 제공하지 않습니다. 사설/미등록/라이브/재생목록도 받지 않습니다.
+이 소스는 사용자가 이용 권한을 확인한 콘텐츠용입니다. **공개 영상이나 개인용이라는 이유만으로 다운로드·분리 권한이 생기지는 않습니다.** 권리 및 [YouTube 이용약관](https://www.youtube.com/static?template=terms)을 별도로 확인하세요. 체크박스는 허가를 부여하지 않습니다. 지역/연령/로그인/결제/DRM/봇 검사로 막히면 작업이 실패하며, 쿠키·계정·새 프록시 설정·CAPTCHA 풀이·접근제한 우회는 제공하지 않습니다. 관리 환경의 기존 승인된 네트워크 경로를 유지하는 명시적 옵션은 아래를 확인하세요. 사설/미등록/라이브/재생목록도 받지 않습니다.
 
 **모델과 음악의 권리는 코드 라이선스와 별개입니다.** Demucs 코드의 MIT 라이선스를 사전학습 가중치 라이선스로 간주하지 마세요. 현재 유지관리 저장소는 가중치의 라이선스가 명확하지 않다고 설명합니다. 모델을 제공받을 권한/조건을 확인한 후 사용하세요.
 
@@ -33,32 +33,32 @@ cd tools/stem-companion
 py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install "yt-dlp[default]"
-.\.venv\Scripts\python.exe -m pip install "demucs @ git+https://github.com/adefossez/demucs.git@v4.1.0"
+.\.venv\Scripts\python.exe -m pip install "demucs==4.1.0" numpy
 ffmpeg -version
 ffprobe -version
 deno --version
 .\.venv\Scripts\python.exe companion.py --check
 ```
 
-Demucs 저장소 설치에는 Git이 필요합니다. 이 명령은 사용자가 실행할 때만 외부 패키지를 내려받습니다. 저장소 버전/플랫폼 호환성은 아래 검증 범위를 확인하세요.
+Demucs는 공식 PyPI의 고정 버전으로 설치합니다. 4.1.0은 Linux에서도 NumPy를 사용하지만 패키지 의존성 선언에서 빠져 있어 `numpy`를 명시합니다. 이 명령은 사용자가 실행할 때만 외부 패키지를 내려받습니다. 플랫폼 호환성은 아래 검증 범위를 확인하세요.
 
 ### Linux / macOS
 
-Python 3.11/3.12, 가상환경 기능, Git, FFmpeg/FFprobe, Deno를 운영체제에 맞는 신뢰할 수 있는 패키지 관리자로 설치한 뒤:
+Python 3.11/3.12, 가상환경 기능, FFmpeg/FFprobe, Deno를 운영체제에 맞는 신뢰할 수 있는 패키지 관리자로 설치한 뒤:
 
 ```bash
 cd tools/stem-companion
 python3.11 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install 'yt-dlp[default]'
-.venv/bin/python -m pip install 'demucs @ git+https://github.com/adefossez/demucs.git@v4.1.0'
+.venv/bin/python -m pip install 'demucs==4.1.0' numpy
 ffmpeg -version
 ffprobe -version
 deno --version
 .venv/bin/python companion.py --check
 ```
 
-Deno/yt-dlp/ejs가 없어도 로컬 파일 경로의 필요 도구가 있으면 파일 분리는 가능합니다. YouTube 경로는 세 도구를 모두 확인합니다. `--check`는 패키지 메타데이터와 실행파일 존재를 확인할 뿐 모델/음악을 내려받거나 추론하지 않습니다. **존재 확인은 바이너리 호환성 및 추론 성공 검증이 아닙니다.**
+Deno/yt-dlp/ejs가 없어도 로컬 파일 경로의 필요 도구가 있으면 파일 분리는 가능합니다. YouTube 경로는 세 도구를 모두 확인합니다. `--check`는 Demucs·Torch·NumPy 등 패키지 메타데이터와 실행파일 존재를 확인할 뿐 모델/음악을 내려받거나 추론하지 않습니다. **존재 확인은 바이너리 호환성 및 추론 성공 검증이 아닙니다.**
 
 ### 실행: 모델 정책을 하나 선택
 
@@ -78,12 +78,22 @@ Deno/yt-dlp/ejs가 없어도 로컬 파일 경로의 필요 도구가 있으면 
 
 Windows는 위 `.venv/bin/python` 대신 `.\.venv\Scripts\python.exe`를 사용하세요. `--allow-model-download`는 이 프로세스를 위한 **명시적 선택**입니다. 없으면 기본적으로 모델 다운로드를 시작하지 않고 의존성 부족을 표시합니다. **이 리포지터리에 가중치나 바이너리는 들어 있지 않습니다.**
 
-브라우저에서 **http://127.0.0.1:8765** 를 열고 소스/시작초/길이를 선택합니다. 첫 작업은 모델 다운로드 및 초기화로 오래 걸릴 수 있습니다. CPU 기본값은 수 분 이상 걸릴 수 있고 RAM/모델 저장 공간을 별도로 필요로 합니다. 호환 GPU가 설정된 경우 `--device cuda` 또는 지원되는 Mac에서 `--device mps`를 직접 선택할 수 있습니다. 플랫폼별 추론은 아직 실제 검증하지 않았습니다.
+브라우저에서 **http://127.0.0.1:8765** 를 열고 소스/시작초/길이를 선택합니다. 첫 작업은 모델 다운로드 및 초기화로 오래 걸릴 수 있습니다. CPU 기본값은 수 분 이상 걸릴 수 있고 RAM/모델 저장 공간을 별도로 필요로 합니다. 호환 GPU가 설정된 경우 `--device cuda` 또는 지원되는 Mac에서 `--device mps`를 직접 선택할 수 있습니다. 클라우드 Linux CPU에서는 아래 검증 환경으로 직접 합성한 8초 오디오의 실제 분리가 성공했습니다. GPU와 사용자별 설치 환경은 검증하지 않았습니다.
 
 ```bash
 # 캐시 위치 / 포트 선택 (바인딩 주소는 변경 불가)
 .venv/bin/python companion.py --allow-model-download --cache-dir ./local-cache --port 8766
 ```
+
+### 관리 환경의 승인된 기존 프록시가 필요한 경우
+
+기본값은 프록시 환경변수를 상속하지 않습니다. 회사/클라우드 환경이 이미 설정한 **신뢰할 수 있는 승인된 egress 프록시** 없이는 일반 인터넷 연결이 되지 않는 경우에만 다음 옵션을 직접 선택합니다.
+
+```bash
+.venv/bin/python companion.py --allow-model-download --trust-env-proxy
+```
+
+이 옵션은 기존 `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY` / `NO_PROXY` 및 소문자 변형만 자식 도구에 전달합니다. 새 주소를 지정하거나 네트워크 보안 설정을 바꾸지 않으며, 웹 UI나 작업 API에서 프록시를 받을 수 없습니다. 프록시 URL에 자격증명이 포함되어 있다면 자식 도구도 그 값을 받으므로 **환경 설정을 신뢰할 때만** 선택하세요. 앱은 해당 값을 상태 응답에 노출하지 않지만, 외부 도구 오류에는 민감한 값이 포함될 수 있으므로 오류 전문을 공개하지 마세요. 계정 토큰·쿠키·임의 인증서/Python 설정은 계속 제외합니다. 접근 거부/지역/로그인/봇 제한을 우회하는 용도가 아니며 그런 오류는 중단합니다.
 
 원하는 권한 있는 녹음의 **짧은 구간부터** 사용하세요. 전체 취득 과정은 원본 길이/크기 상한을 적용하고, 분리 및 재생은 선택 구간만 사용합니다. 취득 중 사이트 정책/도구 호환성 오류는 그대로 멈춥니다. 파일 업로드란 인터넷 업로드가 아니라 자신의 loopback 서버로 읽어 들이는 것을 의미합니다.
 
@@ -91,7 +101,7 @@ Windows는 위 `.venv/bin/python` 대신 `.\.venv\Scripts\python.exe`를 사용�
 
 - 바인딩은 `127.0.0.1`로 고정. Host/Origin, Fetch Metadata, 매 실행 생성 CSRF 토큰을 검사하며 CORS를 열지 않습니다.
 - HTTPS YouTube 지정 호스트 + 11자리 영상 ID만 허용하고 URL을 재구성합니다. 임의 URL/인자/플러그인/다운로드 명령/경로를 받지 않습니다.
-- 다운로드 설정/쿠키/계정/사용자 프록시를 상속하지 않습니다. yt-dlp 원격 컴포넌트 자동 취득도 비활성화하고 설치된 ejs와 Deno를 사용합니다.
+- 다운로드 설정/쿠키/계정은 상속하지 않습니다. 프록시도 기본적으로 제외하며 `--trust-env-proxy`를 선택한 경우에만 위 allowlist의 기존 승인된 환경 경로를 상속합니다. yt-dlp 원격 컴포넌트 자동 취득도 비활성화하고 설치된 ejs와 Deno를 사용합니다.
 - 미디어 검사/변환은 로컬 file 프로토콜과 지원 컨테이너만 허용합니다. URL 재생목록/FFmpeg 네트워크 입력은 거부합니다. 이것은 OS 샌드박스가 아니므로 신뢰할 수 없는 바이너리/가중치/고의적 악성 파일을 실행하지 마세요.
 - 동시에 한 작업만 보유합니다. 기존 결과를 삭제해야 새 작업을 만들 수 있습니다. 동시 프로세스 및 프레임워크 실행은 한 작업으로 한정합니다.
 - 작업 폴더 한도 512 MiB, 취득 5분, 일반 변환 2분, 분리 30분 등 단계별 제한을 적용합니다. 주기 검사 한도는 하드 OS 디스크 쿼터가 아니며 순간 초과 가능성이 있습니다. **모델 캐시는 512 MiB 작업 상한과 별도**입니다.
@@ -108,9 +118,9 @@ node --check static/app.js
 node --test tests/test_ui.cjs
 ```
 
-자동 테스트는 합성 오디오와 모의 subprocess/취득/모델만 사용합니다. 실제 곡, YouTube 취득, 모델 가중치 다운로드 및 모델 추론은 테스트하지 않습니다. 생성된 모의 스템은 분리 품질의 증거가 아닙니다. 자세한 최종 실행 결과는 `VERIFICATION.md`를 참조하세요.
+자동 회귀 테스트는 합성 오디오와 모의 취득/모델을 사용합니다. 생성된 모의 스템은 분리 품질의 증거가 아닙니다. 별도 클라우드 실행에서는 공식 PyPI Demucs 4.1.0, CPU PyTorch 2.12.0, NumPy 2.3.5를 가상환경에 설치하고, 직접 합성한 8초 음악을 실제 HTTP 업로드→FFmpeg 변환→Demucs 실행 경로로 시험했습니다. **기본 직접 연결은 DNS 실패로 멈췄고, 기존 승인된 환경 프록시를 명시적으로 허용한 실행에서는 실제 추론·4개 스템 생성·onset JSON·HTTP 조회/삭제가 성공했습니다.** 8초 입력은 약 20초에 처리됐으며 피크 자식 프로세스 RSS는 약 1.14 GiB였습니다. 이는 합성 입력의 작동 검증이지 실곡 분리 품질 보장은 아닙니다. 자세한 실행 명령·결과는 `VERIFICATION.md`를 참조하세요.
 
-**미검증:** 사용자의 Windows/macOS/Linux 설치, 실제 Demucs/PyTorch 조합, 실곡 취득·분리 품질/속도, 실제 브라우저/오디오 장치의 청감·지연, YouTube의 향후 사이트 변경. 이들은 설치 없이 소스만 작성한 이번 검증의 범위 밖입니다. YouTube 추출 실패를 접근제한 우회로 복구하지 않습니다.
+**미검증:** 사용자의 Windows/macOS/Linux 설치, GPU 추론, 실곡 취득·분리 품질/속도, 실제 브라우저/오디오 장치의 청감·지연, YouTube의 향후 사이트 변경. 한 클라우드 환경의 합성 입력 성공은 사용자 장치 호환성이나 실곡 품질의 증거가 아닙니다. YouTube 추출 실패를 접근제한 우회로 복구하지 않습니다.
 
 ## 출처와 재사용
 

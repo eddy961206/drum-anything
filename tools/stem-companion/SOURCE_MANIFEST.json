@@ -3,23 +3,23 @@
   "files": [
     {
       "path": ".gitignore",
-      "bytes": 142,
-      "sha256": "a1f93f3ebfe7af4c77a5e613b0b32336d50e151604d73125ca4ec3af23079d66"
+      "bytes": 161,
+      "sha256": "cb1a1ea9e32cc8cc3ba81c22954c2c7a13c6c0709d4849e7f6846b36adce0de8"
     },
     {
       "path": "README.md",
-      "bytes": 12090,
-      "sha256": "e8a883818f4e06272b32a044f6e3ace05288b755152060cc19de632c17a160ab"
+      "bytes": 14335,
+      "sha256": "10045c3cb43cacfac6b8a2c4b9ec0b93f62cb5dbef677f07104d11101aa72a28"
     },
     {
       "path": "VERIFICATION.md",
-      "bytes": 3177,
-      "sha256": "1e3cf44c0d9bf0e22adedfc4a2997d8534d8b23a97fcdd0f6888f871a4548f6f"
+      "bytes": 7000,
+      "sha256": "692b832ee2f71256ee21cb6e169b4402fd4e9399ed3570b2711de749416dd375"
     },
     {
       "path": "companion.py",
-      "bytes": 31994,
-      "sha256": "5e20d6557043ab54b9a5102e1fff9768b87377997e83ad9321bf12436639c0c3"
+      "bytes": 33049,
+      "sha256": "2597920b073770975e7f0ac6bcf81bfd5871cc4edd875a428af0a6b7a54da702"
     },
     {
       "path": "static/index.html",
@@ -38,8 +38,8 @@
     },
     {
       "path": "tests/test_companion.py",
-      "bytes": 21726,
-      "sha256": "96f653de89091437a12f7ad4d2dc71476f154a99c1ac4ad3886173d06c59d6e8"
+      "bytes": 24418,
+      "sha256": "28273b91edefa8c0de888a0075291455f093804ad87bb3364d8fe468874c3ad2"
     },
     {
       "path": "tests/test_ui.cjs",

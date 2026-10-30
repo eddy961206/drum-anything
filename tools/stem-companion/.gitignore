@@ -1,4 +1,5 @@
-.venv/
+.venv*/
+.tools-download*/
 __pycache__/
 *.pyc
 local-cache/

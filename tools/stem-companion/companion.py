@@ -124,12 +124,15 @@ class Config:
     allow_model_download: bool = False
     model_repo: Path | None = None
     device: str = 'cpu'
+    trust_env_proxy: bool = False
 
     def dependencies(self):
-        versions = {name: package_version(name) for name in ('demucs', 'yt-dlp', 'yt-dlp-ejs')}
+        # Demucs 4.1.0 imports NumPy on every platform, but its Linux package
+        # metadata does not require it. Check core runtime presence explicitly.
+        versions = {name: package_version(name) for name in ('demucs', 'torch', 'numpy', 'yt-dlp', 'yt-dlp-ejs')}
         for name in ('ffmpeg', 'ffprobe', 'deno'):
             versions[name] = shutil.which(name)
-        missing = [name for name in ('ffmpeg', 'ffprobe', 'demucs') if not versions[name]]
+        missing = [name for name in ('ffmpeg', 'ffprobe', 'demucs', 'torch', 'numpy') if not versions[name]]
         if not self.allow_model_download and self.model_repo is None:
             missing.append('model policy: choose --model-repo or explicitly --allow-model-download')
         if self.model_repo and not self.model_repo.is_dir():
@@ -137,7 +140,8 @@ class Config:
         extra = [name for name in ('yt-dlp', 'yt-dlp-ejs', 'deno') if not versions[name]]
         return {'ready': not missing, 'youtube_ready': not missing and not extra,
                 'missing': missing, 'youtube_missing': extra, 'versions': versions,
-                'model_download_allowed': self.allow_model_download}
+                'model_download_allowed': self.allow_model_download,
+                'trusted_environment_proxy': self.trust_env_proxy}
 
 
 @dataclass
@@ -209,8 +213,14 @@ class Manager:
             job.status, job.message = status, message
 
     def environment(self):
-        # Do not inherit proxies, credentials, Python injection or user tool config.
+        # Never inherit account credentials, Python injection or user tool config.
+        # Managed environments may require their existing approved egress proxy;
+        # passing that limited setting is an explicit process-level opt-in only.
         env = {k: os.environ[k] for k in ('PATH', 'SYSTEMROOT', 'WINDIR', 'COMSPEC', 'PATHEXT', 'LANG', 'LC_ALL') if k in os.environ}
+        if self.config.trust_env_proxy:
+            proxy_names = ('HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY',
+                           'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy')
+            env.update({k: os.environ[k] for k in proxy_names if k in os.environ})
         home = self.config.cache / 'tool-home'
         home.mkdir(exist_ok=True, mode=0o700)
         temporary = home / 'tmp'
@@ -300,10 +310,13 @@ class Manager:
         return output.read_text(errors='replace')
 
     def ytdlp_args(self):
-        return [sys.executable, '-m', 'yt_dlp', '--ignore-config', '--no-plugin-dirs', '--no-playlist',
-                '--no-cache-dir', '--no-remote-components', '--proxy', '', '--xff', 'never',
+        args = [sys.executable, '-m', 'yt_dlp', '--ignore-config', '--no-plugin-dirs', '--no-playlist',
+                '--no-cache-dir', '--no-remote-components', '--xff', 'never',
                 '--no-progress', '--socket-timeout', '20', '--retries', '1', '--fragment-retries', '1',
                 '--format', 'bestaudio[ext=m4a]/bestaudio', '--js-runtimes', 'deno']
+        if not self.config.trust_env_proxy:
+            args += ['--proxy', '']
+        return args
 
     def acquire(self, job):
         self.stage(job, 'acquiring', 'Checking the public single-video source; access restrictions stop the job.')
@@ -635,6 +648,8 @@ def main():
     model.add_argument('--allow-model-download', action='store_true', help='Explicitly permit Demucs to download its third-party model weights.')
     model.add_argument('--model-repo', type=Path, help='Existing trusted local Demucs repository containing htdemucs YAML and weights.')
     parser.add_argument('--device', choices=('cpu', 'cuda', 'mps'), default='cpu')
+    parser.add_argument('--trust-env-proxy', action='store_true',
+                        help='Explicitly trust and inherit existing HTTP(S)/ALL/NO_PROXY variables; never use to evade access restrictions.')
     parser.add_argument('--check', action='store_true', help='Print dependency presence and exit; does not import models or download anything.')
     args = parser.parse_args()
     if sys.version_info < (3, 11):
@@ -642,7 +657,7 @@ def main():
     if not 1024 <= args.port <= 65535:
         parser.error('Use a port between 1024 and 65535.')
     config = Config(args.cache_dir.expanduser().resolve(), args.allow_model_download,
-                    args.model_repo.expanduser().resolve() if args.model_repo else None, args.device)
+                    args.model_repo.expanduser().resolve() if args.model_repo else None, args.device, args.trust_env_proxy)
     if args.check:
         print(json.dumps(config.dependencies(), indent=2))
         return

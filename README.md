@@ -35,7 +35,7 @@ python3 -m http.server 4173 --directory apps/doongtak/dist
 
 The companion runs separately on your own computer, not inside a hosted frontend. It requires external tools for permitted public-URL acquisition or local-file processing and four-stem separation. No model weights, binaries, or music are bundled; model downloads require an explicit choice. It does not provide cookies, account access, DRM/paywall/region bypass, or a workaround for blocked acquisition.
 
-**상태 / Status:** 소스와 모의 테스트 완료. 실제 장치 설치, YouTube 취득, 모델 추론 및 청감은 미검증입니다. / Source and mock tests are ready; device setup, genuine YouTube acquisition, model inference, and listening quality remain unverified. See the companion README for Windows/Linux/macOS setup, rights, model-license limitations, and local data cleanup.
+**상태 / Status:** 소스·모의 테스트와 직접 합성한 8초 입력의 실제 CPU 분리를 검증했습니다. 실제 장치 설치, YouTube 취득, 실곡 분리 품질 및 청감은 미검증입니다. / Source, mock tests, and real CPU separation of an original 8-second synthetic input are verified; user-device setup, genuine YouTube acquisition, real-song quality, and listening remain unverified. See the companion README for Windows/Linux/macOS setup, rights, model-license limitations, and local data cleanup.
 
 ## 확인 · Check
 

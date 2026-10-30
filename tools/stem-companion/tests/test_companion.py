@@ -89,6 +89,28 @@ class Validators(unittest.TestCase):
             self.assertRaises(c.Problem, c.safe_child, root, 'link', 'outside')
 
 
+class Dependencies(unittest.TestCase):
+    def test_core_runtime_metadata_required_without_importing_models(self):
+        for absent in ('demucs', 'torch', 'numpy'):
+            with self.subTest(absent=absent), tempfile.TemporaryDirectory() as tmp:
+                with patch.object(c, 'package_version', side_effect=lambda name: None if name == absent else 'test-version'), \
+                     patch.object(c.shutil, 'which', side_effect=lambda name: '/tools/' + name):
+                    deps = c.Config(Path(tmp), allow_model_download=True).dependencies()
+                self.assertFalse(deps['ready'])
+                self.assertFalse(deps['youtube_ready'])
+                self.assertEqual(deps['missing'], [absent])
+
+    def test_core_runtime_present_can_be_ready_without_youtube_tools(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(c, 'package_version', side_effect=lambda name: 'test-version' if name in ('demucs', 'torch', 'numpy') else None), \
+                 patch.object(c.shutil, 'which', side_effect=lambda name: None if name == 'deno' else '/tools/' + name):
+                deps = c.Config(Path(tmp), allow_model_download=True).dependencies()
+            self.assertTrue(deps['ready'])
+            self.assertFalse(deps['youtube_ready'])
+            self.assertEqual(deps['missing'], [])
+            self.assertEqual(deps['youtube_missing'], ['yt-dlp', 'yt-dlp-ejs', 'deno'])
+
+
 class ManagerChecks(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -164,6 +186,30 @@ class ManagerChecks(unittest.TestCase):
         env = self.manager.environment()
         self.assertNotIn('HF_HUB_OFFLINE', env)
         self.assertNotIn('TRANSFORMERS_OFFLINE', env)
+
+    def test_explicit_trusted_proxy_inherits_only_proxy_allowlist(self):
+        self.config.trust_env_proxy = True
+        allowed = {'HTTPS_PROXY': 'http://approved-egress.invalid:8080',
+                   'https_proxy': 'http://approved-egress.invalid:8080',
+                   'NO_PROXY': 'localhost,127.0.0.1'}
+        forbidden = {'HF_TOKEN': 'secret', 'PYTHONPATH': 'secret', 'PIP_PROXY': 'unrelated',
+                     'AWS_SECRET_ACCESS_KEY': 'secret', 'SSL_CERT_FILE': '/untrusted/cert'}
+        with patch.dict('os.environ', {**allowed, **forbidden}, clear=True):
+            env = self.manager.environment()
+        for key, value in allowed.items():
+            self.assertEqual(env[key], value)
+        for key in forbidden:
+            self.assertNotIn(key, env)
+        self.assertEqual(env['HF_HUB_DISABLE_IMPLICIT_TOKEN'], '1')
+
+    def test_explicit_trusted_proxy_does_not_override_downloader_route(self):
+        self.config.trust_env_proxy = True
+        args = self.manager.ytdlp_args()
+        self.assertNotIn('--proxy', args)
+        self.assertIn('--ignore-config', args)
+        self.assertIn('--no-plugin-dirs', args)
+        self.assertIn('--no-remote-components', args)
+        self.assertNotIn('--cookies', args)
 
     def test_model_repo_is_passed_to_fixed_demucs_name_without_network_fallback(self):
         self.config.allow_model_download = False
