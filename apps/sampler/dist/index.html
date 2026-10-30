@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#fff8e7">
+  <meta name="description" content="컵도 키보드도 내 목소리도 악기가 되는 브라우저 속 작은 소리 수집소. 녹음과 파일은 업로드되지 않아요.">
+  <title>소리 수집소 · 이것도 악기네?</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="shell">
+    <header><a class="wordmark" href="./" aria-label="소리 수집소 홈">소리 수집소<span class="brand-dot" aria-hidden="true"></span></a><p class="privacy-top">내 소리는 이 브라우저 안에서만.</p></header>
+    <main>
+      <section class="intro" aria-labelledby="title"><h1 id="title">이것도 악기네?</h1><p>컵도, 키보드도, 내 목소리도.<br class="mobile-break"> 일단 두드려 봐요.</p></section>
+      <section class="pads" aria-label="소리 패드">
+        <article class="pad-card yellow"><button class="pad" data-pad="0" aria-label="뽁 소리 재생, 키보드 A"><svg viewBox="0 0 200 65" aria-hidden="true"><path d="M10 51 Q32 11 55 49 Q85 -31 113 48 Q145 5 175 47"/></svg><span class="pad-name">뽁</span><kbd>A</kbd><span class="sample-origin" id="origin-0">기본 소리</span></button><button class="edit-pad" data-edit="0" aria-pressed="true">소리 바꾸기 <span aria-hidden="true">↗</span></button></article>
+        <article class="pad-card coral"><button class="pad" data-pad="1" aria-label="딱 소리 재생, 키보드 S"><svg viewBox="0 0 200 65" aria-hidden="true"><path d="M10 49 L43 22 L50 49 L96 7 L108 48 L144 25 L148 50 L183 33"/></svg><span class="pad-name">딱</span><kbd>S</kbd><span class="sample-origin" id="origin-1">기본 소리</span></button><button class="edit-pad" data-edit="1" aria-pressed="false">소리 바꾸기 <span aria-hidden="true">↗</span></button></article>
+        <article class="pad-card blue"><button class="pad" data-pad="2" aria-label="보잉 소리 재생, 키보드 D"><svg viewBox="0 0 200 65" aria-hidden="true"><path d="M10 43 Q49 -20 92 32 T184 24"/></svg><span class="pad-name">보잉</span><kbd>D</kbd><span class="sample-origin" id="origin-2">기본 소리</span></button><button class="edit-pad" data-edit="2" aria-pressed="false">소리 바꾸기 <span aria-hidden="true">↗</span></button></article>
+        <article class="pad-card lilac"><button class="pad" data-pad="3" aria-label="바스락 소리 재생, 키보드 F"><svg viewBox="0 0 200 65" aria-hidden="true"><path d="M10 43 Q48 -9 53 30 T85 34 T112 27 T143 31 T165 32 T186 31"/></svg><span class="pad-name">바스락</span><kbd>F</kbd><span class="sample-origin" id="origin-3">기본 소리</span></button><button class="edit-pad" data-edit="3" aria-pressed="false">소리 바꾸기 <span aria-hidden="true">↗</span></button></article>
+      </section>
+      <section class="band panel" aria-labelledby="band-title">
+        <div class="band-toolbar"><h2 id="band-title">우리 집 밴드</h2><button id="transport" class="button primary" aria-pressed="false"><span id="transport-icon" aria-hidden="true">▶</span><span id="transport-text">재생</span></button><label class="tempo">BPM <input id="bpm" type="number" min="50" max="180" value="104" step="1" inputmode="numeric" aria-label="빠르기 BPM, 50에서 180"></label><div class="pattern-actions"><button id="clear-pattern" class="button quiet">비트 비우기</button><button id="demo-pattern" class="button outline">추천 비트</button></div></div>
+        <p class="section-hint">네모를 켜면 그 소리가 반복돼요. 정답은 없어요.</p>
+        <div class="sequence-scroll" tabindex="0" role="region" aria-label="16칸 비트 편집, 좁은 화면에서는 가로로 이동"><div id="sequence" class="sequence"></div></div>
+        <div class="sequence-footer"><span>한 바퀴 = 4박자</span><span class="scroll-hint">← 밀어서 16칸 보기 →</span><span id="play-state">마음에 드는 네모부터.</span></div>
+      </section>
+      <section class="editor panel" aria-labelledby="editor-title">
+        <div class="editor-top"><h2 id="editor-title">1번 소리 바꾸기 <small>(뽁)</small></h2><button id="reset-sample" class="text-button">이 패드 기본 소리로</button></div>
+        <div class="editor-layout"><div class="capture"><div class="capture-actions"><button id="record" class="button primary"><span class="rec-dot" aria-hidden="true"></span><span id="record-text">3초 녹음</span></button><button id="import" class="button outline">파일 가져오기</button></div><input id="file" type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm" hidden><p id="record-help" class="fine">녹음 버튼을 눌러야 마이크 권한을 요청해요.<br>컵을 톡, 키보드를 탁, 목소리로 뿅!</p><p class="fine">파일은 최대 8MB · 12초. 재생 가능한 형식만.</p></div>
+        <div class="trim"><div class="trim-heading"><span>쓸 부분만 자르기</span><span id="duration">준비된 소리</span></div><div class="waveform"><canvas id="waveform" width="800" height="100" aria-label="선택한 소리의 파형"></canvas><div id="trim-window" aria-hidden="true"></div></div><div class="trim-inputs"><label>시작 <output id="start-value">0.00초</output><input id="trim-start" type="range" min="0" max="1" value="0" step="0.01"></label><label>끝 <output id="end-value">0.00초</output><input id="trim-end" type="range" min="0" max="1" value="1" step="0.01"></label></div></div>
+        <div class="save"><button id="preview" class="button outline">▷ 미리 듣기</button><button id="export" class="button outline">↓ WAV 저장</button><p class="fine">자른 소리 하나를 내 기기에 저장해요.</p></div></div>
+      </section>
+      <div id="status" class="status" role="status" aria-live="polite">준비 끝! 패드를 누르면 바로 소리가 나요.</div>
+      <footer><p><strong>업로드하지 않아요.</strong> 소리와 비트는 이 탭의 메모리에만 있어요.<br>새로고침하거나 닫으면 사라져요. 간직할 소리는 WAV로 저장해 주세요.</p><p>기본 소리 4개는 이 앱이 직접 만든 합성음이에요.<br>헤드폰으로 작게 시작하면 더 좋아요.</p></footer>
+      <noscript><p class="status">이 악기를 연주하려면 브라우저의 JavaScript를 켜 주세요.</p></noscript>
+    </main>
+  </div>
+  <script type="module" src="app.mjs"></script>
+</body>
+</html>
