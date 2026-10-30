@@ -10,6 +10,7 @@ A collection of small browser-based music toys, with source, tests, and local ru
 | --- | --- | --- |
 | 둥탁 · Doongtak — 두 손가락 드럼 놀이터 / two-finger drum playground | [`apps/doongtak`](apps/doongtak) | 완료 / Ready |
 | 후렴에 한 방 · Chorus Pocket Remixer — 노래 위에 필인과 효과 연주 / fills and effects over music | [`apps/remixer`](apps/remixer) | 기본 버전 완료 / Base version ready |
+| 내 박자 밴드 · Follow My Rhythm Band — 내가 친 리듬에 반주 / a band around your own tapped rhythm | [`apps/follow-band`](apps/follow-band) | 완료 / Ready |
 
 ## 실행 · Run
 
@@ -21,7 +22,7 @@ Doongtak is a buildless static app. Serve it with Python 3, open `http://localho
 python3 -m http.server 4173 --directory apps/doongtak/dist
 ```
 
-리믹서를 실행하려면 경로를 `apps/remixer/dist`로 바꾸세요. / For the remixer, use `apps/remixer/dist` instead.
+다른 앱은 경로를 `apps/remixer/dist` 또는 `apps/follow-band/dist`로 바꾸세요. / For another app, use `apps/remixer/dist` or `apps/follow-band/dist` instead.
 
 **리믹서 범위 / Remixer scope:** YouTube는 공식 임베드 재생만 지원하며 음원 추출이나 AI 분리는 하지 않습니다. 미리 분리하고 정렬한 로컬 4개 스템(`drums`, `bass`, `other`, `vocals`, 각각 3분 이하)을 불러오면 드럼 음소거와 추정 타격 시점 안내를 사용할 수 있습니다. / YouTube support is official embedded playback only, not audio extraction or AI source separation. Four pre-separated, aligned local stems (each at most 3 minutes) enable drummer mode and estimated onset hints.
 
