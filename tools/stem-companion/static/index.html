@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>내 방의 드러머 · Local Stem Companion</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="site-header"><a href="/" class="brand"><span class="brand-symbol" aria-hidden="true">▥</span> 내 방의 드러머</a><span class="local-label">이 컴퓨터에서만 · 127.0.0.1</span></header>
+    <main>
+      <section class="intro"><h1>좋아하는 노래의<br><em>드러머가 되어봐.</em></h1><p>음원을 네 파트로 나누고, 원래 드럼 대신 내 리듬을 얹어요.</p></section>
+      <section class="source-section" aria-labelledby="source-heading">
+        <div class="section-heading"><h2 id="source-heading">1. 노래 가져오기</h2><span>한 번에 한 곡 · 최대 3분 구간</span></div>
+        <div id="dependencies" class="dependency-notice" role="status">로컬 실행 환경을 확인하고 있어요.</div>
+        <div class="source-tabs" role="group" aria-label="음원 선택 방식"><button type="button" data-source="file" class="selected" aria-pressed="true">내 음악 파일</button><button type="button" data-source="youtube" aria-pressed="false">YouTube 링크</button></div>
+        <form id="source-form">
+          <div id="file-field"><label for="file-input" class="field-label">음악 파일</label><input id="file-input" type="file" accept="audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.opus,.aiff,.aif,.webm"><p class="field-note" id="upload-limit">파일은 외부 서버로 업로드하지 않아요.</p></div>
+          <div id="youtube-field" hidden><label for="youtube-input" class="field-label">공개된 단일 영상 주소</label><input id="youtube-input" type="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" spellcheck="false"><p class="field-note">일반 공개 영상만 처리해요. 로그인·유료·지역 제한·DRM 등을 우회하지 않으며, 정상 접근이 안 되면 멈춰요.</p></div>
+          <div class="excerpt-row"><label for="excerpt-start">시작 위치 <span>초</span><input id="excerpt-start" type="number" min="0" max="899" step="1" value="0" required></label><label for="excerpt-duration">연습할 길이 <span>초</span><input id="excerpt-duration" type="number" min="1" max="180" step="1" value="60" required></label><p>짧게 시작해도 좋아요.<br>분리 속도는 이 컴퓨터의 성능에 따라 달라요.</p></div>
+          <label class="consent"><input type="checkbox" id="rights-confirmed" required><span>이 음원의 다운로드·복제·분리·이용 권한과 적용되는 서비스 약관을 확인했어요. <strong>개인적인 사용이나 공개된 영상이라는 사실만으로 허용되는 것은 아니에요.</strong></span></label>
+          <div class="submit-row"><button class="primary-button" id="create-job" type="submit" disabled>음원 분리 시작</button><p>첫 실행에 모델 가중치가 필요해요. 기본은 자동 다운로드 없음.<br><code>--allow-model-download</code>로 실행한 경우 분리 시 외부 모델을 받을 수 있어요.</p></div>
+        </form>
+        <p class="notice error" id="form-error" role="alert" hidden></p>
+      </section>
+      <section id="job-section" class="job-section" aria-labelledby="job-heading" hidden>
+        <div class="job-top"><div><h2 id="job-heading">노래를 준비하고 있어요</h2><p id="job-message" role="status" aria-live="polite"></p></div><span id="job-badge" class="job-badge"></span></div>
+        <ol class="stages" aria-label="실제 처리 단계"><li data-stage="acquiring">가져오기</li><li data-stage="normalizing">구간 정리</li><li data-stage="separating">4파트 분리</li><li data-stage="analyzing">드럼 분석</li><li data-stage="ready">연주 준비</li></ol>
+        <p id="job-error" class="notice error" role="alert" hidden></p>
+        <div class="job-actions"><button type="button" id="cancel-job" class="text-button">작업 취소</button><button type="button" id="delete-job" class="text-button" hidden>이 작업의 로컬 파일 삭제하고 새로 시작</button></div>
+      </section>
+      <section id="player-section" class="player-section" aria-labelledby="player-heading" hidden>
+        <div class="section-heading"><h2 id="player-heading">2. 내 리듬으로 연주하기</h2><span id="audio-status">네 파트를 불러오고 있어요.</span></div>
+        <p id="audio-error" class="notice error" role="alert" hidden></p>
+        <div class="transport"><button id="play" class="play-button" type="button" disabled aria-label="재생">▶</button><div class="track-timeline"><div class="timeline-label"><strong>내 연습 구간</strong><span><output id="elapsed">0:00</output> / <span id="total-time">0:00</span></span></div><label class="sr-only" for="seek">재생 위치</label><input type="range" id="seek" min="0" max="1" value="0" step="0.01" disabled></div><label class="loop-control"><input type="checkbox" id="loop" checked> 반복</label></div>
+        <div class="mix-modes" role="group" aria-label="파트 조합"><button type="button" data-mode="all" class="selected" aria-pressed="true">전체 듣기</button><button type="button" data-mode="vocals" aria-pressed="false">보컬만</button><button type="button" data-mode="instrumental" aria-pressed="false">반주만</button><button type="button" data-mode="drummer" aria-pressed="false">내가 드러머 <span>원래 드럼 끄기</span></button></div>
+        <div class="stem-mixer" id="stem-mixer"></div>
+        <div class="guide-heading"><div><h3>드럼 타이밍 힌트</h3><p>분리된 드럼의 에너지 변화를 바탕으로 추정해요. 정확한 악보나 악기 구분은 아니에요.</p></div><span id="onset-count"></span></div>
+        <div class="guide"><canvas id="onset-canvas" aria-label="추정된 드럼 타격 시점이 재생 위치로 다가오는 시각 안내"></canvas><span class="guide-now">지금</span></div>
+        <p class="guide-note">점은 타이밍만 알려줘요. 패드는 직접 눌렀을 때만 소리가 나요.</p>
+        <div id="stem-downloads" class="stem-downloads" aria-label="분리된 WAV 파일 저장"></div>
+      </section>
+      <section class="pads-section" aria-labelledby="pads-heading"><div class="pads-heading"><h2 id="pads-heading">리듬은, 내 손끝에서.</h2><p>키보드 또는 터치로 언제든 자유롭게 연주해요.</p></div><div class="pads"><button type="button" class="pad kick" id="kick-pad" aria-label="킥 드럼, D 키"><span class="pad-instrument" aria-hidden="true">◎</span><strong>Kick</strong><span>낮고 묵직하게</span><kbd>D</kbd></button><button type="button" class="pad snare" id="snare-pad" aria-label="스네어 드럼, F 키"><span class="pad-instrument" aria-hidden="true">≋</span><strong>Snare</strong><span>가볍고 경쾌하게</span><kbd>F</kbd></button></div><p class="pad-note" id="pad-status" role="status">실제 녹음 샘플이 아닌 합성 드럼이에요. 작은 볼륨으로 시작해요.</p></section>
+    </main>
+    <footer><span>음원과 결과물은 로컬 캐시에 저장돼요. 필요 없어진 작업은 위에서 삭제해 주세요.</span><span>Local Stem Companion · 실행 중에만 연결됨</span></footer>
+  </div>
+</body>
+</html>

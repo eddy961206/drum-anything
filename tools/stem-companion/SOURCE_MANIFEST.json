@@ -1,0 +1,50 @@
+{
+  "description": "Original local-only companion source; no audio, weights, binaries or credentials. Project license not selected.",
+  "files": [
+    {
+      "path": ".gitignore",
+      "bytes": 142,
+      "sha256": "a1f93f3ebfe7af4c77a5e613b0b32336d50e151604d73125ca4ec3af23079d66"
+    },
+    {
+      "path": "README.md",
+      "bytes": 12090,
+      "sha256": "e8a883818f4e06272b32a044f6e3ace05288b755152060cc19de632c17a160ab"
+    },
+    {
+      "path": "VERIFICATION.md",
+      "bytes": 3177,
+      "sha256": "1e3cf44c0d9bf0e22adedfc4a2997d8534d8b23a97fcdd0f6888f871a4548f6f"
+    },
+    {
+      "path": "companion.py",
+      "bytes": 31994,
+      "sha256": "5e20d6557043ab54b9a5102e1fff9768b87377997e83ad9321bf12436639c0c3"
+    },
+    {
+      "path": "static/index.html",
+      "bytes": 7514,
+      "sha256": "9b876f5d1fa295a59a2db4a10a31af9b7a241d2251b2a5f86b4894bedd1bbb2f"
+    },
+    {
+      "path": "static/app.js",
+      "bytes": 25632,
+      "sha256": "c051500c2bf95c837d175c3390b0fc1c6f399a176592ef60a0b7ceb92604cac3"
+    },
+    {
+      "path": "static/style.css",
+      "bytes": 10779,
+      "sha256": "7be441bb81d188bf2e75b25a4da1c71f640c1d19c71efa18edef344afbe0f110"
+    },
+    {
+      "path": "tests/test_companion.py",
+      "bytes": 21726,
+      "sha256": "96f653de89091437a12f7ad4d2dc71476f154a99c1ac4ad3886173d06c59d6e8"
+    },
+    {
+      "path": "tests/test_ui.cjs",
+      "bytes": 11413,
+      "sha256": "3696e5340cf4806189e67ac99e8957b4244551007e3fcfc819a94757ecf7d80d"
+    }
+  ]
+}

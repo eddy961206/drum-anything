@@ -26,6 +26,14 @@ python3 -m http.server 4173 --directory apps/doongtak/dist
 
 **리믹서 범위 / Remixer scope:** YouTube는 공식 임베드 재생만 지원하며 음원 추출이나 AI 분리는 하지 않습니다. 미리 분리하고 정렬한 로컬 4개 스템(`drums`, `bass`, `other`, `vocals`, 각각 3분 이하)을 불러오면 드럼 음소거와 추정 타격 시점 안내를 사용할 수 있습니다. / YouTube support is official embedded playback only, not audio extraction or AI source separation. Four pre-separated, aligned local stems (each at most 3 minutes) enable drummer mode and estimated onset hints.
 
+## 로컬 보조 앱 · Local companion
+
+[`tools/stem-companion`](tools/stem-companion)는 정적 웹 앱과 별도로 **사용자 컴퓨터에서만 실행하는 Python 보조 앱**입니다. 외부 yt-dlp / FFmpeg / Demucs 설치 후, 이용 권한이 있는 공개 단일 YouTube URL 또는 로컬 파일의 선택 구간을 4개 스템으로 분리하는 경로를 제공합니다. 정적 웹 앱에 자동으로 연결하거나 프로그램을 자동 설치하지 않습니다.
+
+The companion runs separately on your own computer, not inside a hosted frontend. It requires external tools for permitted public-URL acquisition or local-file processing and four-stem separation. No model weights, binaries, or music are bundled; model downloads require an explicit choice. It does not provide cookies, account access, DRM/paywall/region bypass, or a workaround for blocked acquisition.
+
+**상태 / Status:** 소스와 모의 테스트 완료. 실제 장치 설치, YouTube 취득, 모델 추론 및 청감은 미검증입니다. / Source and mock tests are ready; device setup, genuine YouTube acquisition, model inference, and listening quality remain unverified. See the companion README for Windows/Linux/macOS setup, rights, model-license limitations, and local data cleanup.
+
 ## 확인 · Check
 
 Node.js 20 이상과 npm이 필요합니다. 런타임 의존성이나 설치 단계는 없습니다.
@@ -35,6 +43,16 @@ Requires Node.js 20+ and npm. No dependency installation is needed.
 ```sh
 npm test
 npm run check
+```
+
+위 명령은 브라우저 앱을 검사합니다. 로컬 보조 앱은 별도로 검사하세요. / The commands above check browser apps. Check the companion separately:
+
+```sh
+cd tools/stem-companion
+python3 -m unittest discover -s tests -v
+node --test tests/test_ui.cjs
+python3 -m py_compile companion.py
+node --check static/app.js
 ```
 
 앱별 조작 방법과 구현 설명은 각 폴더의 README를 참고하세요. / See each app's README for controls and implementation notes.
