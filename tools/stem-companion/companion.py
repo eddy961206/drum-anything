@@ -13,6 +13,7 @@ import re
 import secrets
 import shutil
 import signal
+import struct
 import subprocess
 import sys
 import threading
@@ -24,9 +25,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 MAX_UPLOAD = 100 * 1024 * 1024
-MAX_SOURCE_SECONDS = 900
-MAX_EXCERPT_SECONDS = 180
-MAX_JOB_BYTES = 512 * 1024 * 1024
+MAX_SOURCE_SECONDS = 3600
+MAX_EXCERPT_SECONDS = MAX_SOURCE_SECONDS
+MAX_JOB_BYTES = 10 * 1024 * 1024 * 1024
+MODEL_STEP_SECONDS = 45
+MODEL_OVERLAP_SECONDS = 5
+PLAYBACK_CHUNK_SECONDS = 20
 STEMS = ('vocals', 'bass', 'drums', 'other')
 TERMINAL = {'ready', 'failed', 'cancelled', 'dependency_missing'}
 FORMATS = 'wav,mp3,flac,mov,ogg,matroska,webm,aac,aiff'
@@ -76,14 +80,73 @@ def excerpt(start, duration):
     try:
         if isinstance(start, bool) or isinstance(duration, bool):
             raise ValueError()
-        start, duration = float(start), float(duration)
-        if not (math.isfinite(start) and math.isfinite(duration)):
+        start = float(start)
+        if not math.isfinite(start) or not 0 <= start < MAX_SOURCE_SECONDS:
             raise ValueError()
-        if not (0 <= start < MAX_SOURCE_SECONDS and 1 <= duration <= MAX_EXCERPT_SECONDS):
+        if duration == 'full':
+            if start != 0:
+                raise ValueError()
+            return start, None
+        duration = float(duration)
+        if not math.isfinite(duration) or not 1 <= duration <= MAX_EXCERPT_SECONDS:
             raise ValueError()
     except (ValueError, TypeError, OverflowError):
-        raise Problem('Excerpt start must be 0–899 seconds; length must be 1–180 seconds.') from None
+        raise Problem('Start must be 0–3599 seconds; length must be 1–3600 seconds, or select the full song.') from None
     return start, duration
+
+
+def model_windows(duration):
+    """Bound inference memory while overlapping adjacent pieces for a smooth join."""
+    windows = [(0.0, min(duration, MODEL_STEP_SECONDS + MODEL_OVERLAP_SECONDS))]
+    while windows[-1][0] + windows[-1][1] < duration - 1 / 44100:
+        start = windows[-1][0] + MODEL_STEP_SECONDS
+        windows.append((start, min(duration - start, MODEL_STEP_SECONDS + MODEL_OVERLAP_SECONDS)))
+    return windows
+
+
+def float_wav_peak(path, cancel=None):
+    """Read Demucs float WAV in bounded blocks; never clip or rescale stems separately."""
+    import numpy as np
+    with path.open('rb') as stream:
+        header = stream.read(12)
+        if len(header) != 12 or header[:4] != b'RIFF' or header[8:] != b'WAVE':
+            raise Problem('Demucs produced an invalid WAV file.')
+        valid_format = False
+        while chunk := stream.read(8):
+            if len(chunk) != 8:
+                raise Problem('Demucs produced a truncated WAV header.')
+            name, size = struct.unpack('<4sI', chunk)
+            if name == b'fmt ':
+                if not 16 <= size <= 4096:
+                    raise Problem('Demucs produced an unsupported WAV format.')
+                data = stream.read(size)
+                if len(data) != size:
+                    raise Problem('Demucs produced a truncated WAV format.')
+                fmt, channels, rate, _, _, bits = struct.unpack_from('<HHIIHH', data)
+                valid_format = (fmt, channels, rate, bits) == (3, 2, 44100, 32)
+            elif name == b'data':
+                if not valid_format or size % 4:
+                    raise Problem('Demucs produced an unsupported float WAV.')
+                remaining, peak = size, 0.0
+                while remaining:
+                    if cancel and cancel.is_set():
+                        raise Cancelled('Cancelled by user.')
+                    count = min(remaining, 1024 * 1024)
+                    data = stream.read(count)
+                    if len(data) != count:
+                        raise Problem('Demucs produced truncated audio.')
+                    samples = np.frombuffer(data, dtype='<f4')
+                    if not np.isfinite(samples).all():
+                        raise Problem('Demucs produced non-finite audio samples.')
+                    if samples.size:
+                        peak = max(peak, float(np.max(np.abs(samples))))
+                    remaining -= count
+                return peak
+            else:
+                stream.seek(size, 1)
+            if size % 2:
+                stream.seek(1, 1)
+    raise Problem('Demucs produced a WAV without audio data.')
 
 
 def safe_child(root: Path, *parts: str) -> Path:
@@ -107,7 +170,7 @@ def validate_youtube_metadata(info):
         if not math.isfinite(duration) or not 0 < duration <= MAX_SOURCE_SECONDS or not math.isfinite(size) or not 0 <= size <= MAX_UPLOAD:
             raise ValueError()
     except (KeyError, ValueError, TypeError):
-        raise Problem('Source duration/size is unknown or exceeds 15 minutes / 100 MiB.') from None
+        raise Problem('Source duration/size is unknown or exceeds 60 minutes / 100 MiB.') from None
     return duration
 
 
@@ -149,19 +212,21 @@ class Job:
     id: str
     directory: Path
     start: float
-    length: float
+    length: float | None
     url: str | None = None
     status: str = 'queued'
     message: str = 'Waiting for worker.'
     error: str | None = None
     duration: float = 0
+    output_gain: float = 1
     onsets: list = field(default_factory=list)
     cancel: threading.Event = field(default_factory=threading.Event)
     process: subprocess.Popen | None = field(default=None, repr=False)
 
     def public(self):
         return {'id': self.id, 'status': self.status, 'message': self.message,
-                'error': self.error, 'duration': self.duration, 'onsets': self.onsets,
+                'error': self.error, 'duration': self.duration, 'output_gain': self.output_gain, 'onsets': self.onsets,
+                'chunk_seconds': PLAYBACK_CHUNK_SECONDS,
                 'stems': {s: f'/media/{self.id}/{s}.wav' for s in STEMS} if self.status == 'ready' else {}}
 
 
@@ -273,6 +338,7 @@ class Manager:
         output = job.directory / 'command.out'
         errors = job.directory / 'command.err'
         started = time.monotonic()
+        next_disk_check = started
         kwargs = {'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == 'nt' else {'start_new_session': True}
         with output.open('wb') as out, errors.open('wb') as err:
             proc = subprocess.Popen(args, cwd=job.directory, env=self.environment(), stdin=subprocess.DEVNULL,
@@ -287,9 +353,10 @@ class Manager:
                         raise Problem(f'Operation exceeded {timeout} seconds and was stopped.')
                     if output.stat().st_size > output_limit or errors.stat().st_size > 2 * 1024 * 1024:
                         raise Problem('Tool output exceeded its safety limit.')
-                    used = self.disk_bytes(job.directory)
-                    if used > MAX_JOB_BYTES:
-                        raise Problem('Job exceeded the 512 MiB temporary-disk limit.')
+                    if time.monotonic() >= next_disk_check:
+                        if self.disk_bytes(job.directory) > MAX_JOB_BYTES:
+                            raise Problem('Job exceeded the 10 GiB temporary-disk limit.')
+                        next_disk_check = time.monotonic() + 1
                 if job.cancel.is_set():
                     raise Cancelled('Cancelled by user.')
             finally:
@@ -300,7 +367,7 @@ class Manager:
         if output.stat().st_size > output_limit or errors.stat().st_size > 2 * 1024 * 1024:
             raise Problem('Tool output exceeded its safety limit.')
         if self.disk_bytes(job.directory) > MAX_JOB_BYTES:
-            raise Problem('Job exceeded the 512 MiB temporary-disk limit.')
+            raise Problem('Job exceeded the 10 GiB temporary-disk limit.')
         if proc.returncode:
             with errors.open('rb') as error_stream:
                 error_stream.seek(max(0, errors.stat().st_size - 2400))
@@ -326,7 +393,7 @@ class Manager:
         validate_youtube_metadata(info)
         if info.get('id') != job.url.split('=')[-1]:
             raise Problem('Unexpected video identity returned by downloader.')
-        self.stage(job, 'acquiring', 'Acquiring bounded public audio locally (100 MiB / 15-minute source cap).')
+        self.stage(job, 'acquiring', 'Acquiring public audio locally (100 MiB / 60-minute source cap).')
         self.run(job, self.ytdlp_args() + ['--max-filesize', str(MAX_UPLOAD), '--no-part',
                  '--output', str(job.directory / 'source.%(ext)s'), '--', job.url], timeout=300)
         sources = [p for p in job.directory.glob('source.*') if p.is_file()]
@@ -348,7 +415,7 @@ class Manager:
             if not 8000 <= int(audios[0].get('sample_rate', 0)) <= 192000:
                 raise ValueError()
         except (ValueError, KeyError, TypeError):
-            raise Problem('Unsupported media metadata: require audio, 1–8 channels, 8–192 kHz, ≤15 minutes.') from None
+            raise Problem('Unsupported media metadata: require audio, 1–8 channels, 8–192 kHz, ≤60 minutes.') from None
         return duration
 
     def _work(self, job):
@@ -360,31 +427,72 @@ class Manager:
             source_duration = self.probe(job, source)
             if job.start >= source_duration:
                 raise Problem('Excerpt start is after the end of this recording.')
-            length = min(job.length, source_duration - job.start)
+            length = source_duration if job.length is None else min(job.length, source_duration - job.start)
+            windows = model_windows(length)
+            # Float model outputs are twice the PCM16 input size. Include overlapping pieces and one assembled stem.
+            sample_bytes = 44100 * 2 * 2
+            estimated_peak = source.stat().st_size + math.ceil(sample_bytes * (
+                2 * length + 9 * sum(piece_length for _, piece_length in windows))) + 64 * 1024 * 1024
+            if estimated_peak > MAX_JOB_BYTES:
+                raise Problem('The selected audio exceeds the temporary storage limit.')
+            if shutil.disk_usage(job.directory).free < estimated_peak:
+                raise Problem('Not enough free disk space for the selected audio.')
             self.run(job, ['ffmpeg', '-nostdin', '-v', 'error', '-y', '-protocol_whitelist', 'file',
                       '-format_whitelist', FORMATS, '-ss', str(job.start), '-i', str(source),
                       '-t', str(length), '-map', '0:a:0', '-vn', '-sn', '-dn', '-ac', '2', '-ar', '44100',
-                      '-c:a', 'pcm_s16le', str(job.directory / 'excerpt.wav')], timeout=120)
+                      '-c:a', 'pcm_s16le', str(job.directory / 'excerpt.wav')], timeout=max(120, int(length * 2)))
+            tracks = [job.directory / 'excerpt.wav']
+            if len(windows) > 1:
+                tracks = []
+                for index, (start, piece_length) in enumerate(windows):
+                    track = job.directory / f'piece-{index:03d}.wav'
+                    self.run(job, ['ffmpeg', '-nostdin', '-v', 'error', '-y', '-protocol_whitelist', 'file',
+                              '-format_whitelist', 'wav', '-ss', str(start), '-i', str(job.directory / 'excerpt.wav'),
+                              '-t', str(piece_length), '-ac', '2', '-ar', '44100', '-c:a', 'pcm_s16le', str(track)],
+                             timeout=max(120, int(piece_length * 2)))
+                    tracks.append(track)
+                (job.directory / 'excerpt.wav').unlink()
+                source.unlink()
             self.stage(job, 'separating', 'Demucs is separating four stems. CPU inference can take several minutes.')
             args = [sys.executable, '-m', 'demucs', '-n', 'htdemucs', '-d', self.config.device,
-                    '--shifts', '1', '-j', '0', '-o', str(job.directory / 'separated')]
+                    '--shifts', '1', '--float32', '--clip-mode', 'none', '-j', '0', '-o', str(job.directory / 'separated')]
             if self.config.model_repo:
                 args += ['--repo', str(self.config.model_repo.resolve())]
-            args.append(str(job.directory / 'excerpt.wav'))
-            self.run(job, args, timeout=1800)
+            args.extend(map(str, tracks))
+            self.run(job, args, timeout=max(1800, int(length * 8)))
+            if len(tracks) > 1:
+                for track in tracks:
+                    track.unlink()
             self.stage(job, 'analyzing', 'Checking aligned stems and estimating drum-hit timestamps.')
+            separated = {name: [safe_child(job.directory, 'separated', 'htdemucs', track.stem, name + '.wav')
+                                for track in tracks] for name in STEMS}
+            if not all(src.is_file() for sources in separated.values() for src in sources):
+                raise Problem('Demucs did not produce every stem piece.')
+            peak = max(float_wav_peak(src, job.cancel) for sources in separated.values() for src in sources)
+            job.output_gain = min(1.0, 0.98 / peak) if peak else 1.0
             lengths = []
             for name in STEMS:
-                src = safe_child(job.directory, 'separated', 'htdemucs', 'excerpt', name + '.wav')
-                if not src.is_file():
-                    raise Problem(f'Demucs did not produce {name}.wav.')
+                sources = separated[name]
                 dst = job.directory / (name + '.wav')
-                # Stable PCM16 / stereo output, whatever the installed Demucs writer uses.
-                self.run(job, ['ffmpeg', '-nostdin', '-v', 'error', '-y', '-protocol_whitelist', 'file',
-                               '-format_whitelist', 'wav', '-i', str(src), '-t', str(length), '-ac', '2', '-ar', '44100',
-                               '-c:a', 'pcm_s16le', str(dst)], timeout=60)
+                command = ['ffmpeg', '-nostdin', '-v', 'error', '-y']
+                for src in sources:
+                    command += ['-protocol_whitelist', 'file', '-format_whitelist', 'wav', '-i', str(src)]
+                if len(sources) > 1:
+                    filters = []
+                    for index in range(1, len(sources)):
+                        left = '[0:a]' if index == 1 else f'[joined{index - 1}]'
+                        filters.append(f'{left}[{index}:a]acrossfade=d={MODEL_OVERLAP_SECONDS}:c1=tri:c2=tri[joined{index}]')
+                    filters.append(f'[joined{len(sources) - 1}]volume={job.output_gain:.10f}[balanced]')
+                    command += ['-filter_complex', ';'.join(filters), '-map', '[balanced]']
+                else:
+                    command += ['-af', f'volume={job.output_gain:.10f}']
+                command += ['-t', str(length), '-ac', '2', '-ar', '44100', '-c:a', 'pcm_s16le', str(dst)]
+                self.run(job, command, timeout=max(120, int(length * 2)))
                 with wave.open(str(dst), 'rb') as wav:
                     lengths.append(wav.getnframes())
+                if len(sources) > 1:
+                    for src in sources:
+                        src.unlink()
             if max(lengths) - min(lengths) > 441:
                 raise Problem('Stem alignment validation failed.')
             job.duration = min(lengths) / 44100
@@ -502,6 +610,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.headers.get('Sec-Fetch-Site') in ('cross-site', 'same-site'):
             raise Problem('Cross-site access is not allowed.')
         if mutation:
+            if host != f'127.0.0.1:{port}':
+                raise Problem('Mutations are available only on the main local origin.')
             if origin != 'http://' + host:
                 raise Problem('Same-origin mutation required.')
             if not secrets.compare_digest(self.headers.get('X-CSRF-Token', ''), self.server.csrf):
@@ -509,15 +619,21 @@ class Handler(BaseHTTPRequestHandler):
             if self.headers.get('Transfer-Encoding'):
                 raise Problem('Chunked uploads are not supported.')
 
-    def common_headers(self, content_type, length):
+    def common_headers(self, content_type, length, preview=False):
         self.send_header('Content-Type', content_type)
         self.send_header('Content-Length', str(length))
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
-        self.send_header('X-Frame-Options', 'DENY')
-        self.send_header('Cross-Origin-Resource-Policy', 'same-origin')
-        self.send_header('Referrer-Policy', 'no-referrer')
-        self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; media-src 'self' blob:; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
+        port = self.server.server_port
+        if preview:
+            # The official YouTube script runs on a separate localhost origin with no API access.
+            self.send_header('Referrer-Policy', 'strict-origin-when-cross-origin')
+            self.send_header('Content-Security-Policy', f"default-src 'none'; script-src 'self' https://www.youtube.com; style-src 'unsafe-inline'; frame-src https://www.youtube.com https://www.youtube-nocookie.com; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors http://127.0.0.1:{port}; form-action 'none'")
+        else:
+            self.send_header('X-Frame-Options', 'DENY')
+            self.send_header('Cross-Origin-Resource-Policy', 'same-origin')
+            self.send_header('Referrer-Policy', 'no-referrer')
+            self.send_header('Content-Security-Policy', f"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; media-src 'self' blob:; img-src 'self' data:; frame-src http://localhost:{port}; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
         self.end_headers()
 
     def json_response(self, data, status=200):
@@ -548,8 +664,25 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         try:
-            self.guard()
             path = urlsplit(self.path).path
+            port = self.server.server_port
+            preview_files = {'/youtube-preview.html': ('youtube-preview.html', 'text/html; charset=utf-8'),
+                             '/youtube-preview.js': ('youtube-preview.js', 'text/javascript; charset=utf-8')}
+            if self.headers.get('Host') == f'localhost:{port}' and path in preview_files:
+                if len(self.headers.get_all('Host', [])) != 1:
+                    raise Problem('Duplicate or missing authority headers.')
+                name, mime = preview_files[path]
+                self.file_response(STATIC / name, mime, preview=True)
+                return
+            self.guard()
+            if self.headers.get('Host') == f'localhost:{port}':
+                if path in ('/', '/index.html'):
+                    self.send_response(302)
+                    self.send_header('Location', f'http://127.0.0.1:{port}/')
+                    self.common_headers('text/plain; charset=utf-8', 0)
+                else:
+                    self.json_response({'error': 'Not found.'}, 404)
+                return
             if path == '/api/session':
                 self.json_response({'csrf': self.server.csrf, 'dependencies': self.server.manager.config.dependencies(),
                     'limits': {'max_upload_bytes': MAX_UPLOAD, 'max_source_seconds': MAX_SOURCE_SECONDS,
@@ -564,6 +697,13 @@ class Handler(BaseHTTPRequestHandler):
                     if job.status != 'ready':
                         raise Problem('Audio is not ready.')
                     self.file_response(safe_child(job.directory, filename), 'audio/wav')
+            elif re.fullmatch(r'/media/[a-f0-9]{32}/chunks/[0-9]{1,5}/(vocals|bass|drums|other)\.wav', path):
+                _, _, jid, _, index, filename = path.split('/')
+                with self.server.manager.lock:
+                    job = self.server.manager._get(jid)
+                    if job.status != 'ready':
+                        raise Problem('Audio is not ready.')
+                    self.chunk_response(safe_child(job.directory, filename), int(index))
             elif path in ('/', '/index.html', '/app.js', '/style.css'):
                 name = 'index.html' if path == '/' else path[1:]
                 mime = {'index.html': 'text/html; charset=utf-8', 'app.js': 'text/javascript; charset=utf-8', 'style.css': 'text/css; charset=utf-8'}[name]
@@ -573,11 +713,36 @@ class Handler(BaseHTTPRequestHandler):
         except (Problem, ValueError, OSError) as exc:
             self.json_response({'error': str(exc)}, 400)
 
-    def file_response(self, path, mime):
+    def file_response(self, path, mime, preview=False):
         with path.open('rb') as stream:
             self.send_response(200)
-            self.common_headers(mime, path.stat().st_size)
+            self.common_headers(mime, path.stat().st_size, preview=preview)
             shutil.copyfileobj(stream, self.wfile, 64 * 1024)
+
+    def chunk_response(self, path, index):
+        with wave.open(str(path), 'rb') as wav:
+            channels, width, rate = wav.getnchannels(), wav.getsampwidth(), wav.getframerate()
+            if (channels, width, rate) != (2, 2, 44100):
+                raise Problem('Unexpected playback audio format.')
+            start = index * PLAYBACK_CHUNK_SECONDS * rate
+            frames = min(PLAYBACK_CHUNK_SECONDS * rate, wav.getnframes() - start)
+            if frames <= 0:
+                raise Problem('Playback chunk is outside the audio.')
+            size = frames * channels * width
+            header = struct.pack('<4sI4s4sIHHIIHH4sI', b'RIFF', 36 + size, b'WAVE', b'fmt ', 16,
+                                 1, channels, rate, rate * channels * width, channels * width,
+                                 width * 8, b'data', size)
+            wav.setpos(start)
+            self.send_response(200)
+            self.common_headers('audio/wav', len(header) + size)
+            try:
+                self.wfile.write(header)
+                while frames:
+                    count = min(frames, 16384)
+                    self.wfile.write(wav.readframes(count))
+                    frames -= count
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                pass
 
     def do_POST(self):
         try:
@@ -662,8 +827,12 @@ def main():
         print(json.dumps(config.dependencies(), indent=2))
         return
     manager = Manager(config)
-    server = Server(('127.0.0.1', args.port), manager)
-    print(f'Open http://127.0.0.1:{args.port} — local only. Ctrl+C stops and clears this session.')
+    try:
+        server = Server(('127.0.0.1', args.port), manager)
+    except Exception:
+        manager.close()
+        raise
+    print(f'Open http://127.0.0.1:{args.port} - local only. Ctrl+C stops and clears this session.')
     print('No model is loaded until a job is submitted. Dependency check:', json.dumps(config.dependencies()))
     try:
         server.serve_forever()

@@ -14,13 +14,34 @@
     <main>
       <section class="intro"><h1>좋아하는 노래의<br><em>드러머가 되어봐.</em></h1><p>음원을 네 파트로 나누고, 원래 드럼 대신 내 리듬을 얹어요.</p></section>
       <section class="source-section" aria-labelledby="source-heading">
-        <div class="section-heading"><h2 id="source-heading">1. 노래 가져오기</h2><span>한 번에 한 곡 · 최대 3분 구간</span></div>
+        <div class="section-heading"><h2 id="source-heading">1. 노래 가져오기</h2><span>한 번에 한 곡 · 원본 최대 60분 / 100 MB</span></div>
         <div id="dependencies" class="dependency-notice" role="status">로컬 실행 환경을 확인하고 있어요.</div>
         <div class="source-tabs" role="group" aria-label="음원 선택 방식"><button type="button" data-source="file" class="selected" aria-pressed="true">내 음악 파일</button><button type="button" data-source="youtube" aria-pressed="false">YouTube 링크</button></div>
         <form id="source-form">
           <div id="file-field"><label for="file-input" class="field-label">음악 파일</label><input id="file-input" type="file" accept="audio/*,.wav,.mp3,.m4a,.aac,.flac,.ogg,.opus,.aiff,.aif,.webm"><p class="field-note" id="upload-limit">파일은 외부 서버로 업로드하지 않아요.</p></div>
-          <div id="youtube-field" hidden><label for="youtube-input" class="field-label">공개된 단일 영상 주소</label><input id="youtube-input" type="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" spellcheck="false"><p class="field-note">일반 공개 영상만 처리해요. 로그인·유료·지역 제한·DRM 등을 우회하지 않으며, 정상 접근이 안 되면 멈춰요.</p></div>
-          <div class="excerpt-row"><label for="excerpt-start">시작 위치 <span>초</span><input id="excerpt-start" type="number" min="0" max="899" step="1" value="0" required></label><label for="excerpt-duration">연습할 길이 <span>초</span><input id="excerpt-duration" type="number" min="1" max="180" step="1" value="60" required></label><p>짧게 시작해도 좋아요.<br>분리 속도는 이 컴퓨터의 성능에 따라 달라요.</p></div>
+          <div id="youtube-field" hidden>
+            <label for="youtube-input" class="field-label">공개된 단일 영상 주소</label>
+            <input id="youtube-input" type="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" spellcheck="false">
+            <p class="field-note">주소를 넣으면 YouTube 플레이어가 연결돼요. 재생이 제한된 영상은 처리할 수 없어요.</p>
+            <div id="youtube-preview-area" class="youtube-preview-area" hidden>
+              <iframe id="youtube-preview" title="YouTube 영상 미리보기" sandbox="allow-scripts allow-same-origin allow-presentation" allow="autoplay; encrypted-media; picture-in-picture" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+              <p id="youtube-preview-status" class="field-note" role="status">영상 길이를 확인하고 있어요.</p>
+            </div>
+          </div>
+          <div class="range-mode" role="group" aria-label="분리할 범위">
+            <button type="button" data-range="full" class="selected" aria-pressed="true">전체 곡</button>
+            <button type="button" data-range="excerpt" aria-pressed="false">구간 선택</button>
+          </div>
+          <div id="range-selection" hidden>
+            <div id="visual-selection" class="visual-selection" hidden>
+              <div class="selection-heading"><strong>영상에서 구간 고르기</strong><output id="selection-label">0:00 – 0:00</output></div>
+              <div class="selection-track" aria-hidden="true"><span id="selection-fill"></span></div>
+              <label for="range-start">시작 지점 <input type="range" id="range-start" min="0" max="1" value="0" step="0.1"></label>
+              <label for="range-end">끝 지점 <input type="range" id="range-end" min="0" max="1" value="1" step="0.1"></label>
+              <div class="selection-actions"><button type="button" id="set-start-current">현재 위치를 시작으로</button><button type="button" id="set-end-current">현재 위치를 끝으로</button><button type="button" id="preview-selection">선택한 시작부터 보기</button></div>
+            </div>
+            <div class="excerpt-row"><label for="excerpt-start">시작 위치 <span>초</span><input id="excerpt-start" type="number" min="0" max="3599" step="0.1" value="0"></label><label for="excerpt-duration">연습할 길이 <span>초</span><input id="excerpt-duration" type="number" min="1" max="3600" step="0.1" value="30"></label><p>영상에서 고르거나 숫자를 직접 입력해요.<br>분리 시간은 곡 길이와 컴퓨터 성능에 따라 달라요.</p></div>
+          </div>
           <label class="consent"><input type="checkbox" id="rights-confirmed" required><span>이 음원의 다운로드·복제·분리·이용 권한과 적용되는 서비스 약관을 확인했어요. <strong>개인적인 사용이나 공개된 영상이라는 사실만으로 허용되는 것은 아니에요.</strong></span></label>
           <div class="submit-row"><button class="primary-button" id="create-job" type="submit" disabled>음원 분리 시작</button><p>첫 실행에 모델 가중치가 필요해요. 기본은 자동 다운로드 없음.<br><code>--allow-model-download</code>로 실행한 경우 분리 시 외부 모델을 받을 수 있어요.</p></div>
         </form>
@@ -43,7 +64,18 @@
         <p class="guide-note">점은 타이밍만 알려줘요. 패드는 직접 눌렀을 때만 소리가 나요.</p>
         <div id="stem-downloads" class="stem-downloads" aria-label="분리된 WAV 파일 저장"></div>
       </section>
-      <section class="pads-section" aria-labelledby="pads-heading"><div class="pads-heading"><h2 id="pads-heading">리듬은, 내 손끝에서.</h2><p>키보드 또는 터치로 언제든 자유롭게 연주해요.</p></div><div class="pads"><button type="button" class="pad kick" id="kick-pad" aria-label="킥 드럼, D 키"><span class="pad-instrument" aria-hidden="true">◎</span><strong>Kick</strong><span>낮고 묵직하게</span><kbd>D</kbd></button><button type="button" class="pad snare" id="snare-pad" aria-label="스네어 드럼, F 키"><span class="pad-instrument" aria-hidden="true">≋</span><strong>Snare</strong><span>가볍고 경쾌하게</span><kbd>F</kbd></button></div><p class="pad-note" id="pad-status" role="status">실제 녹음 샘플이 아닌 합성 드럼이에요. 작은 볼륨으로 시작해요.</p></section>
+      <section class="pads-section" aria-labelledby="pads-heading">
+        <div class="pads-heading"><h2 id="pads-heading">리듬은, 내 손끝에서.</h2><p>키보드 또는 터치로 언제든 자유롭게 연주해요.</p></div>
+        <div class="pads">
+          <button type="button" class="pad kick" id="kick-pad" aria-label="킥 드럼, D 키"><span class="pad-instrument" aria-hidden="true">◎</span><strong>Kick</strong><span>킥</span><kbd>D</kbd></button>
+          <button type="button" class="pad snare" id="snare-pad" aria-label="스네어 드럼, F 키"><span class="pad-instrument" aria-hidden="true">≋</span><strong>Snare</strong><span>스네어</span><kbd>F</kbd></button>
+          <button type="button" class="pad tom" id="tom-pad" aria-label="톰 드럼, S 키"><span class="pad-instrument" aria-hidden="true">◉</span><strong>Tom</strong><span>톰</span><kbd>S</kbd></button>
+          <button type="button" class="pad hat" id="hat-pad" aria-label="닫힌 하이햇, J 키"><span class="pad-instrument" aria-hidden="true">⌁</span><strong>Hi-hat</strong><span>닫힌 하이햇</span><kbd>J</kbd></button>
+          <button type="button" class="pad open-hat" id="open-hat-pad" aria-label="열린 하이햇, K 키"><span class="pad-instrument" aria-hidden="true">≈</span><strong>Open hat</strong><span>열린 하이햇</span><kbd>K</kbd></button>
+          <button type="button" class="pad crash" id="crash-pad" aria-label="크래시 심벌, L 키"><span class="pad-instrument" aria-hidden="true">✳</span><strong>Crash</strong><span>크래시</span><kbd>L</kbd></button>
+        </div>
+        <p class="pad-note" id="pad-status" role="status">합성 드럼 소리예요. 작은 볼륨으로 시작해요.</p>
+      </section>
     </main>
     <footer><span>음원과 결과물은 로컬 캐시에 저장돼요. 필요 없어진 작업은 위에서 삭제해 주세요.</span><span>Local Stem Companion · 실행 중에만 연결됨</span></footer>
   </div>

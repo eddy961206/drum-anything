@@ -1,5 +1,9 @@
 # Verification — 2026-10-30
 
+## 현재 변경 검증 범위
+
+아래 Linux 8초 검증은 이전 구현의 기록이다. 전체 곡 분할 처리, float 출력과 공통 볼륨 보정은 별도로 실제 모델 검증이 필요하다. Windows에서 합성 51초 입력과 모의 모델로 조각 연결 길이를 확인했고, 65초 합성 스템으로 브라우저의 조각 경계·탐색·반복을 확인했다.
+
 ## Automated regression checks
 
 - Python unit tests: **42 / 42** passed.

@@ -8,43 +8,53 @@
     },
     {
       "path": "README.md",
-      "bytes": 14335,
-      "sha256": "10045c3cb43cacfac6b8a2c4b9ec0b93f62cb5dbef677f07104d11101aa72a28"
+      "bytes": 16097,
+      "sha256": "ee4a8c437bae3e291347dde227ba2c0f74caf38ef182d57b298e3341e78c30d3"
     },
     {
       "path": "VERIFICATION.md",
-      "bytes": 7000,
-      "sha256": "692b832ee2f71256ee21cb6e169b4402fd4e9399ed3570b2711de749416dd375"
+      "bytes": 7387,
+      "sha256": "0854863c22cb643fdaa24cd04daedf4afd33ca15b49cd3c7f5dbf09a84c95442"
     },
     {
       "path": "companion.py",
-      "bytes": 33049,
-      "sha256": "2597920b073770975e7f0ac6bcf81bfd5871cc4edd875a428af0a6b7a54da702"
+      "bytes": 42711,
+      "sha256": "22d2316cf078eec4a572d1c473a3c37680108887d2673f21655ccfda5ac0346b"
     },
     {
       "path": "static/index.html",
-      "bytes": 7514,
-      "sha256": "9b876f5d1fa295a59a2db4a10a31af9b7a241d2251b2a5f86b4894bedd1bbb2f"
+      "bytes": 10221,
+      "sha256": "ee4f1b30ab406502801737c54984abe088f976785b9287a37bbff0f3563f4770"
     },
     {
       "path": "static/app.js",
-      "bytes": 25632,
-      "sha256": "c051500c2bf95c837d175c3390b0fc1c6f399a176592ef60a0b7ceb92604cac3"
+      "bytes": 40253,
+      "sha256": "f656ab3ad5a5a6c98b6e64614459048367f8efd9dda8badcadf29f2d919f2334"
     },
     {
       "path": "static/style.css",
-      "bytes": 10779,
-      "sha256": "7be441bb81d188bf2e75b25a4da1c71f640c1d19c71efa18edef344afbe0f110"
+      "bytes": 13016,
+      "sha256": "e32f16ea4d86ac6543f32991ef76ba393ac2850bdb73089f8d8aa88bc6021b98"
     },
     {
       "path": "tests/test_companion.py",
-      "bytes": 24418,
-      "sha256": "28273b91edefa8c0de888a0075291455f093804ad87bb3364d8fe468874c3ad2"
+      "bytes": 30387,
+      "sha256": "607fba510a4a72cda9b915f03505915ae302dcec3a3f8759b6238f1ee002fbe6"
     },
     {
       "path": "tests/test_ui.cjs",
-      "bytes": 11413,
-      "sha256": "3696e5340cf4806189e67ac99e8957b4244551007e3fcfc819a94757ecf7d80d"
+      "bytes": 15372,
+      "sha256": "4962397045ccd4830829d8bdbf6b2592e2481616bf881024e0e1f935bc5684ee"
+    },
+    {
+      "path": "static/youtube-preview.html",
+      "bytes": 647,
+      "sha256": "916a3d27f8467ed9e4cc977da6ff53b3bed0d8f02465c8f0258d9a724739803e"
+    },
+    {
+      "path": "static/youtube-preview.js",
+      "bytes": 4012,
+      "sha256": "a757638058a91ddc9281b874f6a723d7356d150f7adcaa6bca976f0f8223e092"
     }
   ]
 }

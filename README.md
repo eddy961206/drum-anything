@@ -31,11 +31,11 @@ python3 -m http.server 4173 --directory apps/doongtak/dist
 
 ## 로컬 보조 앱 · Local companion
 
-[`tools/stem-companion`](tools/stem-companion)는 정적 웹 앱과 별도로 **사용자 컴퓨터에서만 실행하는 Python 보조 앱**입니다. 외부 yt-dlp / FFmpeg / Demucs 설치 후, 이용 권한이 있는 공개 단일 YouTube URL 또는 로컬 파일의 선택 구간을 4개 스템으로 분리하는 경로를 제공합니다. 정적 웹 앱에 자동으로 연결하거나 프로그램을 자동 설치하지 않습니다.
+[`tools/stem-companion`](tools/stem-companion)는 정적 웹 앱과 별도로 **사용자 컴퓨터에서만 실행하는 Python 보조 앱**입니다. 외부 yt-dlp / FFmpeg / Demucs 설치 후, 이용 권한이 있는 공개 단일 YouTube URL 또는 로컬 파일의 전체 곡이나 선택 구간을 4개 스템으로 분리합니다. YouTube 미리보기에서 구간을 고르고 여섯 드럼 패드를 연주할 수 있습니다.
 
 The companion runs separately on your own computer, not inside a hosted frontend. It requires external tools for permitted public-URL acquisition or local-file processing and four-stem separation. No model weights, binaries, or music are bundled; model downloads require an explicit choice. It does not provide cookies, account access, DRM/paywall/region bypass, or a workaround for blocked acquisition.
 
-**상태 / Status:** 소스·모의 테스트와 직접 합성한 8초 입력의 실제 CPU 분리를 검증했습니다. 실제 장치 설치, YouTube 취득, 실곡 분리 품질 및 청감은 미검증입니다. / Source, mock tests, and real CPU separation of an original 8-second synthetic input are verified; user-device setup, genuine YouTube acquisition, real-song quality, and listening remain unverified. See the companion README for Windows/Linux/macOS setup, rights, model-license limitations, and local data cleanup.
+**상태 / Status:** 이전 구현에서 Windows의 실제 YouTube 영상 30초 분리를 확인했습니다. 전체 곡 처리의 실제 모델 검증과 청감 확인은 진행 중입니다. / A previous version separated 30 seconds of a real YouTube video on Windows; real-model verification of the full-song path and listening quality remain in progress. See the companion README for setup, rights, model-license limitations, and cleanup.
 
 ## 확인 · Check
 

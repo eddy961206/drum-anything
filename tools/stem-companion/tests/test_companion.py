@@ -1,10 +1,12 @@
 """Offline checks only: synthetic audio, mock acquisition/model; no remote requests."""
 import array
 import http.client
+import io
 import json
 import math
 from pathlib import Path
 import shutil
+import struct
 import sys
 import tempfile
 import threading
@@ -57,9 +59,10 @@ class Validators(unittest.TestCase):
                 self.assertRaises(c.Problem, c.youtube_url, value)
 
     def test_excerpt_bounds(self):
-        self.assertEqual(c.excerpt('0', '180'), (0.0, 180.0))
-        self.assertEqual(c.excerpt(899, 1), (899.0, 1.0))
-        for start, length in ((-1, 1), (900, 1), (0, 0.99), (0, 181), (float('nan'), 10),
+        self.assertEqual(c.excerpt('0', '3600'), (0.0, 3600.0))
+        self.assertEqual(c.excerpt(3599, 1), (3599.0, 1.0))
+        self.assertEqual(c.excerpt(0, 'full'), (0.0, None))
+        for start, length in ((-1, 1), (3600, 1), (0, 0.99), (0, 3601), (1, 'full'), (float('nan'), 10),
                               (0, float('inf')), (True, 5), (0, False), ('bad', 2)):
             with self.subTest(start=start, length=length):
                 self.assertRaises(c.Problem, c.excerpt, start, length)
@@ -71,12 +74,21 @@ class Validators(unittest.TestCase):
         for overrides in ({'_type': 'playlist'}, {'entries': [1]}, {'is_live': True},
                           {'live_status': 'is_upcoming'}, {'has_drm': True}, {'age_limit': 18},
                           {'availability': 'private'}, {'availability': 'subscriber_only'},
-                          {'duration': 901}, {'duration': float('nan')}, {'duration': 0},
+                          {'duration': 3601}, {'duration': float('nan')}, {'duration': 0},
                           {'filesize': c.MAX_UPLOAD + 1}, {'filesize': -1},
                           {'filesize': float('nan')}, {'filesize': float('inf')}):
             with self.subTest(overrides=overrides):
                 self.assertRaises(c.Problem, c.validate_youtube_metadata, {'duration': 20, 'availability': 'public', **overrides})
         self.assertRaises(c.Problem, c.validate_youtube_metadata, {})
+
+    def test_long_model_windows_cover_the_song_with_overlap(self):
+        for duration in (1, 50, 51, 90, 204, 3600):
+            windows = c.model_windows(duration)
+            self.assertEqual(windows[0][0], 0)
+            self.assertAlmostEqual(windows[-1][0] + windows[-1][1], duration)
+            for left, right in zip(windows, windows[1:]):
+                self.assertAlmostEqual(left[0] + left[1] - right[0], c.MODEL_OVERLAP_SECONDS)
+                self.assertGreater(right[1], c.MODEL_OVERLAP_SECONDS)
 
     def test_safe_paths(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -85,7 +97,17 @@ class Validators(unittest.TestCase):
             self.assertEqual(c.safe_child(root, 'sub', 'song.wav'), root / 'sub' / 'song.wav')
             for parts in (('..', 'outside'), ('/etc/passwd',), ('.',)):
                 self.assertRaises(c.Problem, c.safe_child, root, *parts)
-            (root / 'link').symlink_to(Path(tmp), target_is_directory=True)
+
+    def test_safe_paths_rejects_symlink_escape(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / 'root'
+            root.mkdir()
+            try:
+                (root / 'link').symlink_to(Path(tmp), target_is_directory=True)
+            except OSError as exc:
+                if getattr(exc, 'winerror', None) == 1314:
+                    self.skipTest('Windows user lacks permission to create symbolic links')
+                raise
             self.assertRaises(c.Problem, c.safe_child, root, 'link', 'outside')
 
 
@@ -335,7 +357,7 @@ class ManagerChecks(unittest.TestCase):
             else:
                 shutil.copyfile(Path(args[args.index('-i') + 1]), Path(args[-1]))
             return ''
-        with patch.object(self.manager, 'run', side_effect=fake_run):
+        with patch.object(self.manager, 'run', side_effect=fake_run), patch.object(c, 'float_wav_peak', return_value=0.5):
             self.manager._work(job)
         self.assertEqual(job.status, 'ready', job.error)
         self.assertEqual(set(job.public()['stems']), set(c.STEMS))
@@ -343,6 +365,9 @@ class ManagerChecks(unittest.TestCase):
         self.assertGreaterEqual(len(job.onsets), 2)
         self.assertEqual({p.name for p in job.directory.iterdir()}, {n + '.wav' for n in c.STEMS})
         self.assertTrue(any('demucs' in args for args in commands))
+        model_command = next(args for args in commands if 'demucs' in args)
+        self.assertIn('--float32', model_command)
+        self.assertEqual(model_command[model_command.index('--clip-mode') + 1], 'none')
 
     @unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'), 'Optional synthetic FFmpeg integration: ffmpeg/ffprobe unavailable')
     def test_synthetic_ffmpeg_pipeline_with_mocked_model_only(self):
@@ -359,13 +384,49 @@ class ManagerChecks(unittest.TestCase):
                     shutil.copyfile(job.directory / 'excerpt.wav', dest / (name + '.wav'))
                 return ''
             return real_run(job_arg, args, **kwargs)
-        with patch.object(self.manager, 'run', side_effect=model_only_mock):
+        with patch.object(self.manager, 'run', side_effect=model_only_mock), patch.object(c, 'float_wav_peak', return_value=1.96):
             self.manager._work(job)
         self.assertEqual(job.status, 'ready', job.error)
         self.assertAlmostEqual(job.duration, 1, places=3)
+        self.assertAlmostEqual(job.output_gain, 0.5)
+        with wave.open(str(job.directory / 'drums.wav'), 'rb') as wav:
+            samples = array.array('h', wav.readframes(wav.getnframes()))
+            self.assertTrue(7400 <= max(samples) <= 7600)
         self.assertEqual(len(job.onsets), 3)
         self.assertTrue(any(args[0] == 'ffprobe' for args in commands))
         self.assertEqual(sum(args[0] == 'ffmpeg' for args in commands), 5)
+
+    @unittest.skipUnless(shutil.which('ffmpeg') and shutil.which('ffprobe'), 'FFmpeg unavailable')
+    def test_full_song_crossfades_multiple_model_pieces_without_losing_time(self):
+        job = self.manager.reserve(0, 'full', True)
+        source = job.directory / 'source.upload'
+        import subprocess
+        subprocess.run(['ffmpeg', '-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=220:duration=51',
+                        '-ac', '2', '-ar', '44100', '-c:a', 'pcm_s16le', '-f', 'wav', str(source)], check=True)
+        with wave.open(str(source), 'rb') as wav:
+            wav.setpos(round(44.5 * 44100))
+            reference = array.array('h', wav.readframes(44100))
+        real_run = self.manager.run
+        def model_only_mock(job_arg, args, **kwargs):
+            if 'demucs' in args:
+                for track in (Path(item) for item in args if str(item).endswith('.wav')):
+                    dest = job.directory / 'separated' / 'htdemucs' / track.stem
+                    dest.mkdir(parents=True)
+                    for name in c.STEMS:
+                        shutil.copyfile(track, dest / (name + '.wav'))
+                return ''
+            return real_run(job_arg, args, **kwargs)
+        with patch.object(self.manager, 'run', side_effect=model_only_mock), patch.object(c, 'float_wav_peak', return_value=0.5):
+            self.manager._work(job)
+        self.assertEqual(job.status, 'ready', job.error)
+        self.assertAlmostEqual(job.duration, 51, places=2)
+        with wave.open(str(job.directory / 'drums.wav'), 'rb') as wav:
+            self.assertEqual(wav.getnframes(), 51 * 44100)
+            wav.setpos(round(44.5 * 44100))
+            joined = array.array('h', wav.readframes(44100))
+        error = math.sqrt(sum((a - b) ** 2 for a, b in zip(reference, joined)) / len(reference))
+        signal = math.sqrt(sum(a * a for a in reference) / len(reference))
+        self.assertLess(error / signal, 0.01)
 
     def test_model_error_stops_pipeline(self):
         job = self.manager.reserve(0, 1, True)
@@ -377,6 +438,21 @@ class ManagerChecks(unittest.TestCase):
 
 
 class AudioChecks(unittest.TestCase):
+    def test_float_wav_peak_preserves_over_range_values_and_rejects_nan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'float.wav'
+            def write(values):
+                data = struct.pack('<' + 'f' * len(values), *values)
+                header = struct.pack('<4sI4s4sIHHIIHH4sI', b'RIFF', 36 + len(data), b'WAVE', b'fmt ', 16,
+                                     3, 2, 44100, 44100 * 8, 8, 32, b'data', len(data))
+                path.write_bytes(header + data)
+            write([0.25, -1.4, 0.5, 0.0])
+            self.assertAlmostEqual(c.float_wav_peak(path), 1.4, places=5)
+            event = threading.Event(); event.set()
+            self.assertRaises(c.Cancelled, c.float_wav_peak, path, event)
+            write([0.1, float('nan')])
+            self.assertRaises(c.Problem, c.float_wav_peak, path)
+
     def test_silence_and_synthetic_pulses(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'fixture.wav'
@@ -435,6 +511,30 @@ class HTTPChecks(unittest.TestCase):
         self.assertEqual(headers['X-Frame-Options'], 'DENY')
         self.assertNotIn('Access-Control-Allow-Origin', headers)
         self.assertIn("frame-ancestors 'none'", headers['Content-Security-Policy'])
+
+    def test_youtube_preview_has_a_separate_origin_without_api_access(self):
+        preview_host = f'localhost:{self.server.server_port}'
+        status, headers, _ = self.request('GET', '/youtube-preview.html', headers={'Host': preview_host})
+        self.assertEqual(status, 200)
+        self.assertNotIn('X-Frame-Options', headers)
+        self.assertIn('frame-ancestors http://' + self.host, headers['Content-Security-Policy'])
+        self.assertEqual(self.request('GET', '/youtube-preview.html')[0], 404)
+        self.assertEqual(self.request('GET', '/api/session', headers={'Host': preview_host})[0], 404)
+        headers = {'Host': preview_host, 'Origin': 'http://' + preview_host, 'X-CSRF-Token': self.server.csrf,
+                   'Content-Type': 'application/json'}
+        self.assertEqual(self.request('POST', '/api/jobs', '{}', headers)[0], 400)
+
+    def test_ready_stems_are_served_as_bounded_wav_chunks(self):
+        job = self.manager.reserve(0, 1, True)
+        write_wav(job.directory / 'drums.wav', pulse=True)
+        job.status, job.duration = 'ready', 1
+        status, headers, data = self.request('GET', f'/media/{job.id}/chunks/0/drums.wav')
+        self.assertEqual(status, 200)
+        self.assertEqual(headers['Content-Type'], 'audio/wav')
+        with wave.open(io.BytesIO(data), 'rb') as wav:
+            self.assertEqual((wav.getnchannels(), wav.getframerate(), wav.getnframes()), (2, 44100, 44100))
+        self.assertEqual(self.request('GET', f'/media/{job.id}/chunks/1/drums.wav')[0], 400)
+        self.manager.delete(job.id)
 
     def test_invalid_host_origin_and_site_are_rejected(self):
         for headers in ({'Host': 'evil.test'}, {'Origin': 'https://evil.test'},
