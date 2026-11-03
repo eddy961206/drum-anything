@@ -31,7 +31,7 @@ python3 -m http.server 4173 --directory apps/doongtak/dist
 
 ## 로컬 보조 앱 · Local companion
 
-[`tools/stem-companion`](tools/stem-companion)는 정적 웹 앱과 별도로 **사용자 컴퓨터에서만 실행하는 Python 보조 앱**입니다. 외부 yt-dlp / FFmpeg / Demucs 설치 후, 이용 권한이 있는 공개 단일 YouTube URL 또는 로컬 파일의 전체 곡이나 선택 구간을 4개 스템으로 분리합니다. YouTube 미리보기에서 구간을 고르고, 전체 또는 지정 구간을 반복하며 여섯 드럼 패드를 연주할 수 있습니다.
+[`tools/stem-companion`](tools/stem-companion)는 정적 웹 앱과 별도로 **사용자 컴퓨터에서만 실행하는 Python 보조 앱**입니다. 외부 yt-dlp / FFmpeg / Demucs 설치 후, 이용 권한이 있는 공개 단일 YouTube URL 또는 로컬 파일의 전체 곡이나 선택 구간을 4개 스템으로 분리합니다. YouTube 미리보기에서 구간을 고르고, 전체 또는 지정 구간을 반복하며 여섯 드럼 패드를 연주할 수 있습니다. 분리된 드럼에서 킥·스네어·심벌 레인을 추정해 따라치기 악보로 보여주고, 친 타이밍을 채점하며, 방금 친 연주를 밴드와 함께 다시 들려줍니다. 느린 연습 속도, 입력 지연 보정, USB 전자드럼(MIDI) 연결도 지원합니다.
 
 The companion runs separately on your own computer, not inside a hosted frontend. It includes six CC0 drum recordings and one user-authorized, four-stem sample song. Playing that sample requires Python 3.11+ and a browser, but no separation tools or model download. Processing a new song requires external tools and an explicit model choice. It does not provide cookies, account access, DRM/paywall/region bypass, or a workaround for blocked acquisition.
 

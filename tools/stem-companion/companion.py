@@ -5,14 +5,17 @@ from __future__ import annotations
 import argparse
 import array
 import importlib.metadata
+import itertools
 import json
 import math
+import operator
 import os
 from pathlib import Path
 import re
 import secrets
 import shutil
 import signal
+import statistics
 import struct
 import subprocess
 import sys
@@ -62,8 +65,8 @@ def bundled_demo():
         raise Problem('The bundled sample stems do not have the expected duration.')
     return {'id': DEMO_ID, 'status': 'ready', 'title': metadata['title'], 'artist': metadata['artist'],
             'youtube_url': metadata['youtube_url'], 'duration': duration, 'output_gain': metadata['output_gain'],
-            'onsets': metadata['onsets'], 'chunk_seconds': PLAYBACK_CHUNK_SECONDS,
-            'stems': {stem: f'/media/{DEMO_ID}/{stem}.wav' for stem in STEMS}}
+            'onsets': metadata['onsets'], 'notes': {lane: metadata.get('notes', {}).get(lane, []) for lane in NOTE_LANES},
+            'chunk_seconds': PLAYBACK_CHUNK_SECONDS, 'stems': {stem: f'/media/{DEMO_ID}/{stem}.wav' for stem in STEMS}}
 
 
 def youtube_url(value):
@@ -241,13 +244,14 @@ class Job:
     duration: float = 0
     output_gain: float = 1
     onsets: list = field(default_factory=list)
+    notes: dict = field(default_factory=dict)
     cancel: threading.Event = field(default_factory=threading.Event)
     process: subprocess.Popen | None = field(default=None, repr=False)
 
     def public(self):
         return {'id': self.id, 'status': self.status, 'message': self.message,
                 'error': self.error, 'duration': self.duration, 'output_gain': self.output_gain, 'onsets': self.onsets,
-                'chunk_seconds': PLAYBACK_CHUNK_SECONDS,
+                'notes': self.notes, 'chunk_seconds': PLAYBACK_CHUNK_SECONDS,
                 'stems': {s: f'/media/{self.id}/{s}.wav' for s in STEMS} if self.status == 'ready' else {}}
 
 
@@ -520,6 +524,7 @@ class Manager:
             if not 0 < job.duration <= MAX_EXCERPT_SECONDS + 0.1:
                 raise Problem('Invalid output duration.')
             job.onsets = detect_onsets(job.directory / 'drums.wav', job.cancel)
+            job.notes = detect_drum_notes(job.directory / 'drums.wav', job.cancel)
             # Successful output keeps only four stems; no source/metadata or command logs retained.
             for child in job.directory.iterdir():
                 if child.name not in {s + '.wav' for s in STEMS}:
@@ -527,7 +532,7 @@ class Manager:
                         shutil.rmtree(child)
                     else:
                         child.unlink()
-            self.stage(job, 'ready', 'Four stems are ready. Drum dots are estimated onsets, not a verified score.')
+            self.stage(job, 'ready', 'Four stems are ready. Drum lanes are estimated from the drum stem, not a verified score.')
         except Cancelled as exc:
             with self.lock:
                 job.status, job.error, job.message = 'cancelled', None, str(exc)
@@ -594,6 +599,109 @@ def detect_onsets(path: Path, cancel=None):
             peaks.append(round(t, 3))
             last = t
     return peaks
+
+
+NOTE_LANES = ('kick', 'snare', 'cymbal')
+NOTE_HOP = 441  # 10 ms at 44.1 kHz
+
+
+def band_envelopes(path: Path, cancel=None):
+    """10 ms RMS of three crude bands: low (<~150 Hz), body (<~2 kHz) and bright (>~5 kHz).
+
+    Box filters and a second difference run through C-level accumulate/map, so a three-minute stem takes seconds.
+    """
+    low_len, body_len, hop = 147, 20, NOTE_HOP
+    bands = {'low': [], 'body': [], 'bright': []}
+    with wave.open(str(path), 'rb') as wav:
+        if wav.getsampwidth() != 2 or wav.getnchannels() not in (1, 2) or wav.getframerate() != 44100:
+            raise Problem('Drum note detector requires 44.1 kHz PCM16 mono/stereo WAV.')
+        channels = wav.getnchannels()
+        history = [0] * (2 * low_len + 4)
+        while raw := wav.readframes(hop * 100):
+            if cancel and cancel.is_set():
+                raise Cancelled('Cancelled by user.')
+            samples = array.array('h', raw)
+            if sys.byteorder != 'little':
+                samples.byteswap()
+            mono = list(map(operator.add, samples[0::2], samples[1::2])) if channels == 2 else [2 * v for v in samples]
+            count = len(mono)
+            signal_ = history + mono
+            sums = [0, *itertools.accumulate(signal_)]
+            once = list(map(operator.sub, sums[low_len:], sums[:-low_len]))
+            twice = [0, *itertools.accumulate(once)]
+            low = list(map(operator.sub, twice[low_len:], twice[:-low_len]))[-count:]
+            body = list(map(operator.sub, sums[body_len:], sums[:-body_len]))[-count:]
+            edge = signal_[-count - 2:]
+            bright = list(map(operator.sub, map(operator.sub, edge[2:], edge[1:-1]), map(operator.sub, edge[1:-1], edge[:-2])))
+            for name, values, scale in (('low', low, low_len * low_len), ('body', body, body_len), ('bright', bright, 1)):
+                energy = [0, *itertools.accumulate(map(operator.mul, values, values))]
+                bands[name].extend(math.sqrt((energy[i + hop] - energy[i]) / hop) / scale / 65536
+                                   for i in range(0, count - hop + 1, hop))
+            history = signal_[-len(history):]
+    return bands
+
+
+def detect_drum_notes(path: Path, cancel=None):
+    """Estimate kick / snare-tom / cymbal lanes from a separated drum stem. A practice guide, not a transcription."""
+    bands = band_envelopes(path, cancel)
+    notes = {lane: [] for lane in NOTE_LANES}
+    if len(bands['body']) < 10 or max(bands['body']) < 0.003:
+        return notes
+    # Compare each band with its own loud level so the rules survive different mixes.
+    floors = {'low': 0.02, 'body': 0.02, 'bright': 0.004}
+    scaled = {}
+    for name, values in bands.items():
+        loud = max(floors[name], statistics.quantiles(values, n=100)[98])
+        scaled[name] = [v / loud for v in values]
+    hops = len(scaled['body'])
+    candidates = []
+    for values in scaled.values():
+        curve = [math.log1p(20 * v) for v in values]
+        last = -99
+        for i in range(4, hops - 1):
+            if (curve[i] >= curve[i + 1] and curve[i] > curve[i - 1] and values[i] > 0.06
+                    and curve[i] - min(curve[i - 4:i]) > 0.12 and i - last >= 6):
+                candidates.append(i)
+                last = i
+    merged = []
+    for i in sorted(candidates):
+        if not merged or i - merged[-1] > 3:
+            merged.append(i)
+    features = []
+    for i in merged:
+        rise, level = {}, {}
+        for name, values in scaled.items():
+            level[name] = max(values[i:i + 5])
+            rise[name] = level[name] - min(values[max(0, i - 4):i + 1])
+        features.append((i, rise, level, level['low'] / max(level['body'], 1e-6)))
+    # Kicks keep most of their body energy below ~150 Hz; snares and toms do not. Split the two groups per song.
+    ratios = [math.log(max(ratio, 1e-6)) for _, rise, _, ratio in features if max(rise['low'], rise['body']) >= 0.3]
+    split = 0.55
+    if len(ratios) >= 8:
+        a, b = min(ratios), max(ratios)
+        for _ in range(30):
+            lower = [r for r in ratios if abs(r - a) <= abs(r - b)]
+            upper = [r for r in ratios if abs(r - a) > abs(r - b)]
+            if not lower or not upper:
+                break
+            a, b = sum(lower) / len(lower), sum(upper) / len(upper)
+        if len(lower) >= 4 and len(upper) >= 4 and b - a >= math.log(2):
+            split = min(0.75, max(0.4, math.exp((a + b) / 2)))
+    snare_brightness = [level['bright'] / max(level['body'], 1e-6) for _, rise, level, ratio in features
+                        if rise['body'] >= 0.3 and ratio < split]
+    snare_brightness = statistics.median(snare_brightness) if snare_brightness else 1.0
+    for i, rise, level, ratio in features:
+        kick = rise['low'] >= 0.2 and ratio >= split
+        snare = rise['body'] >= 0.2 and ratio < split
+        # Snare wires are bright too, so a cymbal on a snare must be clearly brighter than this song's usual snare.
+        cymbal = (rise['bright'] >= 0.15 and (not kick or rise['bright'] >= 0.25)
+                  and (not snare or level['bright'] / max(level['body'], 1e-6) >= 1.6 * snare_brightness))
+        t = round(i * NOTE_HOP / 44100, 3)
+        for lane, present in zip(NOTE_LANES, (kick, snare, cymbal)):
+            # One stroke can leave two nearby peaks; a player cannot follow notes closer than this anyway.
+            if present and (not notes[lane] or t - notes[lane][-1] >= 0.07):
+                notes[lane].append(t)
+    return notes
 
 
 class Server(ThreadingHTTPServer):

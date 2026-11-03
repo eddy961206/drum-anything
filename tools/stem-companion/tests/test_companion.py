@@ -5,6 +5,7 @@ import io
 import json
 import math
 from pathlib import Path
+import random
 import shutil
 import struct
 import sys
@@ -36,6 +37,33 @@ def write_wav(path, seconds=1, pulse=False):
     with wave.open(str(path), 'wb') as out:
         out.setparams((2, 2, rate, 0, 'NONE', 'not compressed'))
         out.writeframes(samples.tobytes())
+
+
+def write_drums(path, hits, seconds=2.0):
+    """Synthetic kit: falling sine kick, tone-plus-noise snare, bright noise cymbal."""
+    rate = 44100
+    noise = random.Random(7)
+    out = [0.0] * round(rate * seconds)
+    for kind, start in hits:
+        first = round(start * rate)
+        for n in range(min(round(0.25 * rate), len(out) - first)):
+            t = n / rate
+            if kind == 'kick':
+                value = 0.9 * math.sin(2 * math.pi * (50 * t + 2.1 * (1 - math.exp(-t / 0.03)))) * math.exp(-t / 0.09)
+            elif kind == 'snare':
+                value = (0.5 * math.sin(2 * math.pi * 190 * t) + 0.4 * noise.uniform(-1, 1)) * math.exp(-t / 0.06)
+            else:
+                value = 0.5 * (noise.uniform(-1, 1) - noise.uniform(-1, 1)) * math.exp(-t / 0.025)
+            out[first + n] += value
+    samples = array.array('h')
+    for value in out:
+        level = int(max(-1, min(1, value)) * 20000)
+        samples.extend((level, level))
+    if sys.byteorder != 'little':
+        samples.byteswap()
+    with wave.open(str(path), 'wb') as wav:
+        wav.setparams((2, 2, rate, 0, 'NONE', 'not compressed'))
+        wav.writeframes(samples.tobytes())
 
 
 class Validators(unittest.TestCase):
@@ -92,7 +120,8 @@ class Validators(unittest.TestCase):
 
     def test_safe_paths(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp) / 'root'
+            # macOS temp folders sit behind the /var -> /private/var symlink.
+            root = Path(tmp).resolve() / 'root'
             root.mkdir()
             self.assertEqual(c.safe_child(root, 'sub', 'song.wav'), root / 'sub' / 'song.wav')
             for parts in (('..', 'outside'), ('/etc/passwd',), ('.',)):
@@ -363,6 +392,7 @@ class ManagerChecks(unittest.TestCase):
         self.assertEqual(set(job.public()['stems']), set(c.STEMS))
         self.assertEqual(job.duration, 1)
         self.assertGreaterEqual(len(job.onsets), 2)
+        self.assertEqual(set(job.public()['notes']), set(c.NOTE_LANES))
         self.assertEqual({p.name for p in job.directory.iterdir()}, {n + '.wav' for n in c.STEMS})
         self.assertTrue(any('demucs' in args for args in commands))
         model_command = next(args for args in commands if 'demucs' in args)
@@ -472,6 +502,27 @@ class AudioChecks(unittest.TestCase):
             event.set()
             self.assertRaises(c.Cancelled, c.detect_onsets, path, event)
 
+    def test_drum_lanes_from_a_synthetic_kit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'kit.wav'
+            expected = {'kick': [0.2, 1.0], 'snare': [0.6, 1.4], 'cymbal': [0.4, 0.8, 1.2, 1.6]}
+            write_drums(path, [(lane, t) for lane, times in expected.items() for t in times])
+            notes = c.detect_drum_notes(path)
+            self.assertEqual(set(notes), set(c.NOTE_LANES))
+            for lane, times in expected.items():
+                self.assertEqual(len(notes[lane]), len(times), (lane, notes))
+                for actual, wanted in zip(notes[lane], times):
+                    self.assertAlmostEqual(actual, wanted, delta=0.03)
+
+    def test_drum_lanes_silence_and_cancel(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'silent.wav'
+            write_wav(path)
+            self.assertEqual(c.detect_drum_notes(path), {lane: [] for lane in c.NOTE_LANES})
+            event = threading.Event()
+            event.set()
+            self.assertRaises(c.Cancelled, c.detect_drum_notes, path, event)
+
 
 class HTTPChecks(unittest.TestCase):
     @classmethod
@@ -546,6 +597,11 @@ class HTTPChecks(unittest.TestCase):
         self.assertEqual(demo['id'], c.DEMO_ID)
         self.assertAlmostEqual(demo['duration'], 204.3356, places=3)
         self.assertEqual(len(demo['onsets']), 262)
+        self.assertEqual(set(demo['notes']), set(c.NOTE_LANES))
+        for lane, times in demo['notes'].items():
+            self.assertGreater(len(times), 50, lane)
+            self.assertEqual(times, sorted(times))
+            self.assertTrue(0 <= times[0] and times[-1] < demo['duration'])
         for index, frames in ((0, 20 * 44100), (10, round((demo['duration'] - 200) * 44100))):
             status, headers, data = self.request('GET', f'/media/{c.DEMO_ID}/chunks/{index}/drums.wav')
             self.assertEqual(status, 200)
